@@ -1,0 +1,1 @@
+Minimalist, offline-first personal finance and debt tracker.
