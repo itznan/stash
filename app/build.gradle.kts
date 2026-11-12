@@ -80,6 +80,7 @@ dependencies {
     ksp("androidx.room:room-compiler:$roomVersion")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
 
     testImplementation("junit:junit:4.13.2")

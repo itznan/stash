@@ -19,6 +19,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import androidx.compose.animation.fadeIn
@@ -171,6 +172,20 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    @Deprecated("Deprecated in Java")
+    @Suppress("DEPRECATION")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        try {
+            super.startActivityForResult(intent, requestCode, options)
+        } catch (e: IllegalArgumentException) {
+            if (e.message?.contains("16 bits") == true) {
+                super.startActivityForResult(intent, requestCode and 0xFFFF, options)
+            } else {
+                throw e
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Step 1: Android Edge-to-Edge compliance
         enableEdgeToEdge()
@@ -253,20 +268,26 @@ class MainActivity : FragmentActivity() {
                 val monthComparison by viewModel.monthComparison.collectAsState()
 
                 val restoreLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.GetContent()
+                    contract = ActivityResultContracts.OpenDocument()
                 ) { uri ->
                     if (uri != null) {
-                        try {
-                            val content = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
-                            viewModel.restoreFromJson(content) { success, count ->
-                                if (success) {
-                                    Toast.makeText(this@MainActivity, "Restored $count transactions from backup!", Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(this@MainActivity, "Failed: invalid backup file", Toast.LENGTH_LONG).show()
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            try {
+                                val content = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+                                viewModel.restoreFromJson(content) { success, count ->
+                                    runOnUiThread {
+                                        if (success) {
+                                            Toast.makeText(this@MainActivity, "Restored $count transactions from backup!", Toast.LENGTH_LONG).show()
+                                        } else {
+                                            Toast.makeText(this@MainActivity, "Failed: invalid backup file", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    Toast.makeText(this@MainActivity, "Restore error: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
-                        } catch (e: Exception) {
-                            Toast.makeText(this@MainActivity, "Restore error: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -512,8 +533,13 @@ class MainActivity : FragmentActivity() {
                                     onExportCsv = onExportCsv,
                                     onBackupJson = onBackupJson,
                                     onRestoreJson = {
-                                        isLaunchingPicker = true
-                                        restoreLauncher.launch("*/*")
+                                        try {
+                                            isLaunchingPicker = true
+                                            restoreLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                                        } catch (e: Exception) {
+                                            isLaunchingPicker = false
+                                            Toast.makeText(this@MainActivity, "Could not open file picker: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
                                     },
                                     onClearAllData = { viewModel.clearAllData() }
                                 )

@@ -8,6 +8,6 @@ Track daily expenses, incomes, bank-cash transfers, and peer-to-peer loans witho
 • <b>Lent Money & Debt Manager</b>: Track loans given to friends and family with due dates, direct Call/WhatsApp actions, and partial repayment logging.
 • <b>Native Keyboard Input</b>: Fast decimal numeric input using your device's software keyboard.
 • <b>Fluid 120Hz Animations</b>: Hardware-accelerated transitions and responsive charts optimized for LTPO displays.
-• <b>Biometric Protection</b>: Lock your sensitive ledger with fingerprint or device credential hardware authentication.
+• <b>Biometric Protection</b>: Lock your sensitive ledger with fingerprint or device lock hardware authentication.
 • <b>Export & Restore</b>: Full control of your financial records with encrypted JSON backups and CSV exports for spreadsheet analysis.
 • <b>Dynamic Theming</b>: Seamlessly integrates with Android 12–15 Monet wallpaper colors in light and dark modes.
