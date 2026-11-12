@@ -9,20 +9,20 @@
 
 ---
 
-## ✨ Features
+## Features
 
-- 🔒 **100% Offline & Private**: Zero internet permissions, zero analytics, zero ads, zero accounts. Your financial data never leaves your device.
-- 💳 **Dual-Wallet Architecture**: Track **Online Money** (bank/UPI) and **Cash Available** separately. Transfer between them with zero ledger distortion.
-- 🤝 **Lent Money & Debt Manager**: Record loans given to friends or colleagues with due dates, partial repayments, and direct Call/WhatsApp action shortcuts.
-- ⌨️ **Native Keyboard Integration**: Ultra-fast decimal input with your mobile's native software keyboard.
-- ⚡ **120Hz LTPO Optimization**: Zero-allocation date parsing, graphicsLayer hardware transforms, and fluid tab switching animations.
-- 🛡️ **Biometric Authentication**: Secure your transaction ledger behind fingerprint or device lock.
-- 🎨 **Monet Dynamic Theming**: Adapts in real-time to your Android wallpaper accents in Light and Dark modes.
-- 💾 **Export & Backup**: Export CSVs for spreadsheet analysis and generate encrypted JSON backups with instant restore.
+- **100% Offline & Private**: Zero internet permissions, zero analytics, zero ads, zero accounts. Your financial data never leaves your device.
+- **Dual-Wallet Architecture**: Track **Online Money** (bank/UPI) and **Cash Available** separately. Transfer between them with zero ledger distortion.
+- **Lent Money & Debt Manager**: Record loans given to friends or colleagues with due dates, partial repayments, and direct Call/WhatsApp action shortcuts.
+- **Native Keyboard Integration**: Ultra-fast decimal input with your mobile's native software keyboard.
+- **120Hz LTPO Optimization**: Zero-allocation date parsing, graphicsLayer hardware transforms, and fluid tab switching animations.
+- **Biometric Authentication**: Secure your transaction ledger behind fingerprint or device lock.
+- **Monet Dynamic Theming**: Adapts in real-time to your Android wallpaper accents in Light and Dark modes.
+- **Export & Backup**: Export CSVs for spreadsheet analysis and generate encrypted JSON backups with instant restore.
 
 ---
 
-## 📥 Installation
+## Installation
 
 ### Method 1: Obtainium (Recommended for Direct Updates)
 1. Download and install [Obtainium](https://github.com/ImranR98/Obtainium).
@@ -38,7 +38,7 @@ Download `Stash.apk` directly from the [Releases](releases) tab.
 
 ---
 
-## 🛠️ Building From Source
+## Building From Source
 
 ### Prerequisites
 - JDK 17
@@ -58,6 +58,6 @@ The output APK will be generated at:
 
 ---
 
-## 📄 License
+## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
