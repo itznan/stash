@@ -1,0 +1,7 @@
+Release v1.0.2:
+
+- Settings screen now shows the real app version read at runtime
+- F-Droid build recipe and fastlane metadata configured
+- Zero network permissions, 100% offline
+
+IMPORTANT: If you installed the debug-signed v1.0.0 or v1.0.1 APK from GitHub, export your JSON backup first (Settings -> Backup Database), uninstall that build, install from F-Droid, then restore your backup. Android will not upgrade over an APK signed with a different key.

@@ -11,3 +11,8 @@ local.properties
 app/build/
 *.apk
 .kotlin/
+
+# Keystores & signing secrets
+*.jks
+*.keystore
+keystore.properties

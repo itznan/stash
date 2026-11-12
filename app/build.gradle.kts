@@ -13,8 +13,8 @@ android {
         applicationId = "com.nan.stash"
         minSdk = 31
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -22,20 +22,6 @@ android {
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
-    }
-
-    val keystorePath = System.getenv("KEYSTORE_PATH")
-    val hasKeystore = !keystorePath.isNullOrBlank() && file(keystorePath).exists()
-
-    signingConfigs {
-        if (hasKeystore) {
-            create("release") {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
-            }
-        }
     }
 
     buildTypes {
@@ -46,7 +32,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = if (hasKeystore) signingConfigs.getByName("release") else null
+            // F-Droid signs with its own key; no signingConfig needed here
         }
         debug {
             applicationIdSuffix = ".debug"
