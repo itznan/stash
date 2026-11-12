@@ -1,0 +1,5 @@
+Release v1.0.1:
+• Fixed backup restore crash caused by 16-bit request code limitation
+• Improved file picker stability with Android Storage Access Framework
+• Updated Android 15 (API 35) display frame rate boost support
+• Streamlined F-Droid reproducible release configuration
