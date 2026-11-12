@@ -1,0 +1,20 @@
+Categories:
+  - Money
+License: Apache-2.0
+AuthorName: Itznan
+SourceCode: https://github.com/itznan/stash
+IssueTracker: https://github.com/itznan/stash/issues
+Changelog: https://github.com/itznan/stash/releases
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: app
+    gradle:
+      - yes

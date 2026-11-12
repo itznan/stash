@@ -1,0 +1,8 @@
+Initial release of Stash (v1.0.0):
+• 100% offline personal finance and dual-wallet tracking (Bank/UPI and Cash)
+• Peer-to-peer loan and debt manager with partial repayment logging and reminders
+• Fast decimal keyboard input and custom tag classification
+• Material 3 dynamic theming (Monet) with dark and light mode
+• Biometric authentication (fingerprint/device lock)
+• Local encrypted JSON backup and CSV export/import
+• Zero internet permissions, zero analytics, zero ads

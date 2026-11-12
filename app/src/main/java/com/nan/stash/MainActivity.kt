@@ -191,7 +191,7 @@ class MainActivity : FragmentActivity() {
             } else {
                 params.preferredRefreshRate = 120f
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
                 params.setFrameRateBoostOnTouchEnabled(true)
             }
             window.attributes = params
