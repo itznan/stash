@@ -1,5 +1,5 @@
 Categories:
-  - Finance Manager
+  - Money
 License: Apache-2.0
 AuthorName: Itznan
 SourceCode: https://github.com/itznan/stash
@@ -12,7 +12,7 @@ Repo: https://github.com/itznan/stash.git
 Builds:
   - versionName: 1.0.2
     versionCode: 3
-    commit: v1.0.2
+    commit: 47a3c5c03e2a8e0d330cf50476fa5c66872614c2
     subdir: app
     gradle:
       - yes

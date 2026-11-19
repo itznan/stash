@@ -16,3 +16,4 @@ app/build/
 *.jks
 *.keystore
 keystore.properties
+*.idsig
