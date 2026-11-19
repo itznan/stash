@@ -52,26 +52,26 @@ class StashWidgetProvider : AppWidgetProvider() {
                     val db = AppDatabase.getDatabase(context)
                     val transactions = db.transactionDao().getAllTransactions().firstOrNull() ?: emptyList()
 
-                    val onlineBal = transactions.sumOf {
-                        when {
-                            it.type == TransactionType.INCOME && it.paymentMode == PaymentMode.ONLINE -> it.amount
-                            it.type == TransactionType.REPAYMENT && it.paymentMode == PaymentMode.ONLINE -> it.amount
-                            it.type == TransactionType.EXPENSE && it.paymentMode == PaymentMode.ONLINE -> -it.amount
-                            it.type == TransactionType.LEND && it.paymentMode == PaymentMode.ONLINE -> -it.amount
-                            it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.ONLINE -> -it.amount
-                            it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.CASH -> it.amount
-                            else -> 0.0
-                        }
-                    }
-                    val cashBal = transactions.sumOf {
-                        when {
-                            it.type == TransactionType.INCOME && it.paymentMode == PaymentMode.CASH -> it.amount
-                            it.type == TransactionType.REPAYMENT && it.paymentMode == PaymentMode.CASH -> it.amount
-                            it.type == TransactionType.EXPENSE && it.paymentMode == PaymentMode.CASH -> -it.amount
-                            it.type == TransactionType.LEND && it.paymentMode == PaymentMode.CASH -> -it.amount
-                            it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.CASH -> -it.amount
-                            it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.ONLINE -> it.amount
-                            else -> 0.0
+                    var onlineBal = 0.0
+                    var cashBal = 0.0
+                    for (t in transactions) {
+                        val isOnline = t.paymentMode == PaymentMode.ONLINE
+                        when (t.type) {
+                            TransactionType.INCOME, TransactionType.REPAYMENT -> {
+                                if (isOnline) onlineBal += t.amount else cashBal += t.amount
+                            }
+                            TransactionType.EXPENSE, TransactionType.LEND -> {
+                                if (isOnline) onlineBal -= t.amount else cashBal -= t.amount
+                            }
+                            TransactionType.TRANSFER -> {
+                                if (isOnline) {
+                                    onlineBal -= t.amount
+                                    cashBal += t.amount
+                                } else {
+                                    cashBal -= t.amount
+                                    onlineBal += t.amount
+                                }
+                            }
                         }
                     }
 

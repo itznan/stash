@@ -35,39 +35,73 @@ Stash/
             │   └── xml/
             │       └── file_paths.xml    # FileProvider content mapping for CSV/JSON export
             └── java/com/nan/stash/
-                ├── MainActivity.kt       # Root Activity: 120Hz display pinning, biometric gate, FAB & Modal orchestration
+                ├── MainActivity.kt       # Root Activity: 120Hz display pinning, biometric gate, Intent routing
                 ├── data/
                 │   ├── model/
                 │   │   ├── TransactionType.kt  # Discriminator enum (INCOME, EXPENSE, TRANSFER, LEND, REPAYMENT)
-                │   │   └── PaymentMode.kt      # Wallet channel enum (ONLINE, CASH)
+                │   │   ├── PaymentMode.kt      # Wallet channel enum (ONLINE, CASH)
+                │   │   └── AnalyticsModels.kt  # CategorySummary, DayTrend, MonthComparison models
+                │   ├── backup/
+                │   │   └── BackupManager.kt    # CSV / JSON backup creation, JSON parsing, sandboxed storage
                 │   └── local/
                 │       ├── TransactionEntity.kt # Room SQL entity for financial transactions
                 │       ├── TransactionDao.kt    # Reactive Room Data Access Object (Flow queries, insert, update, delete)
                 │       ├── LoanEntity.kt        # Room SQL entity for tracked loans (borrower, phone, balance, dates, status)
                 │       ├── LoanDao.kt           # Room Data Access Object for loans (Flow queries, insert, update, delete)
-                │       ├── AppDatabase.kt       # RoomDatabase definition (exportSchema=true, non-destructive migrations 1->4)
+                │       ├── SubscriptionEntity.kt # Room SQL entity for recurring bills & subscriptions
+                │       ├── SubscriptionDao.kt   # Room Data Access Object for subscriptions
+                │       ├── AppDatabase.kt       # RoomDatabase definition (exportSchema=true, non-destructive migrations 1->5)
                 │       └── SettingsDataStore.kt # Proto-like Preferences DataStore for themes, currency, and biometric locks
                 └── ui/
+                    ├── StashApp.kt              # App Scaffold, HorizontalPager, BottomBar & Sheets orchestration
                     ├── MainViewModel.kt         # AndroidViewModel: StateFlow orchestration, transfers, loans, edits, backups
                     ├── navigation/
                     │   ├── NavRoutes.kt         # Sealed class Screen hierarchy (Home, History, Tags, Settings)
                     │   └── BottomNavBar.kt      # Material 3 NavigationBar component
                     ├── components/
-                    │   ├── CommonComponents.kt  # Reusable UI primitives: CategoryIcon, Dynamic Color mapping
-                    │   └── StashLogo.kt         # Procedural reactive Material 3 vector logo component
+                    │   ├── CommonComponents.kt  # Reusable UI primitives: CategoryIcon, Dynamic Color mapping, Keypad, Buttons
+                    │   ├── StashLogo.kt         # Procedural reactive Material 3 vector logo component
+                    │   ├── BiometricLockScreen.kt # Hardware biometric gate & unlock UI
+                    │   └── FabQuickActionMenu.kt  # Segmented floating action popup above FAB
                     ├── screens/
-                    │   ├── HomeScreen.kt        # Primary dashboard: dual-wallet balance, lent money banner, weekly graph, recent feed
-                    │   ├── HistoryScreen.kt     # Filterable transaction ledger (search, chips including Lent, clickable for edit)
-                    │   ├── TagsScreen.kt        # Category analytics: ranked spending cards, percentage shares, month comparisons
-                    │   ├── SettingsScreen.kt    # Preferences: Theme, currency, biometric toggle, CSV/JSON backup
-                    │   ├── AddMoneyBottomSheet.kt      # Native mobile keyboard decimal input modal for income logging
-                    │   ├── SpendMoneyBottomSheet.kt    # Native mobile keyboard decimal input modal for expense logging
-                    │   ├── TransferMoneyBottomSheet.kt # Native mobile keyboard transfer modal (Online ⇄ Cash)
-                    │   ├── EditTransactionBottomSheet.kt # Full-feature transaction editor with decimal keyboard
-                    │   ├── LendMoneyBottomSheet.kt     # Lending entry modal: person name, contact, reason, quick due dates, wallet source
-                    │   └── LentMoneyManagerSheet.kt    # Full loan management: overview, filter chips, direct Call/WhatsApp triggers, repayments
+                    │   ├── home/
+                    │   │   ├── HomeScreen.kt             # Primary dashboard LazyColumn orchestrator
+                    │   │   ├── HomeHeader.kt             # Greeting and notification header
+                    │   │   ├── HeroBalanceCard.kt        # Dual-wallet balance card with Online & Cash indicators
+                    │   │   ├── WeeklyCashFlowCard.kt     # Interactive 7-day capsule chart with animated spring bars
+                    │   │   ├── TransactionRowCard.kt     # Feed transaction row card with dynamic tints
+                    │   │   ├── LentMoneySummaryCard.kt   # Debt overview banner (tap to manage)
+                    │   │   └── SubscriptionSummaryCard.kt # Recurring subscription banner (tap to view)
+                    │   ├── history/
+                    │   │   ├── HistoryScreen.kt          # Filterable ledger (search, chips, date groups)
+                    │   │   └── HistoryItemCard.kt        # Transaction item card with delete action
+                    │   ├── tags/
+                    │   │   ├── TagsScreen.kt             # Category analytics & MoM mode orchestrator
+                    │   │   ├── ExpenseDonutChartCard.kt  # Canvas donut chart with dynamic category arcs
+                    │   │   ├── RankedCategoryCard.kt     # Ranked spending progress bars
+                    │   │   └── MonthOverMonthCard.kt     # MoM comparative analytics & differential pills
+                    │   ├── settings/
+                    │   │   ├── SettingsScreen.kt         # Preferences screen container & clear dialog
+                    │   │   └── SettingsCards.kt          # Modular cards (Appearance, Security, Currency, Backup, Privacy, About)
+                    │   ├── loans/
+                    │   │   ├── LendMoneyBottomSheet.kt   # Lending entry modal (borrower, contact, amount, return date)
+                    │   │   ├── LentMoneyManagerSheet.kt  # Loan management sheet with filter chips
+                    │   │   ├── BorrowerLoanCard.kt       # Individual loan card with Call/WhatsApp triggers & progress bar
+                    │   │   └── LoanDialogs.kt            # Repayment and Lend More dialogs
+                    │   ├── subscriptions/
+                    │   │   ├── SubscriptionManagerSheet.kt # Recurring subscriptions & bills manager
+                    │   │   ├── SubscriptionItemCard.kt     # Subscription card with Paid badge and payment logger
+                    │   │   └── AddSubscriptionFormCard.kt  # Form card for registering recurring bills
+                    │   └── transactions/
+                    │       ├── AddMoneyBottomSheet.kt      # Income logging sheet
+                    │       ├── SpendMoneyBottomSheet.kt    # Expense logging sheet with custom tags
+                    │       ├── TransferMoneyBottomSheet.kt # Wallet transfer sheet (Online ⇄ Cash)
+                    │       └── EditTransactionBottomSheet.kt # Full-feature transaction editor
                     ├── util/
-                    │   └── DateUtils.kt         # Zero-allocation thread-safe DateTimeFormatter singleton for 120Hz scrolling
+                    │   ├── AnalyticsCalculator.kt # Weekly trends, tag distributions, MoM math
+                    │   ├── DateUtils.kt         # Zero-allocation thread-safe DateTimeFormatter singleton for 120Hz scrolling
+                    │   ├── HapticUtils.kt       # Haptic feedback utility
+                    │   └── PdfStatementGenerator.kt # Formatted PDF statement builder
                     └── theme/
                         ├── Color.kt             # Legacy fallback color definitions
                         ├── Shape.kt             # Material 3 rounded corner shape tokens

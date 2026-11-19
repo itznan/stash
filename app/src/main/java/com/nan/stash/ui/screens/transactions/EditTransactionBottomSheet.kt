@@ -1,4 +1,4 @@
-package com.nan.stash.ui.screens
+package com.nan.stash.ui.screens.transactions
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,9 +14,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.Close
@@ -34,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -44,17 +44,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalHapticFeedback
-import com.nan.stash.ui.util.StashHaptics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
 import com.nan.stash.ui.components.getTagIcon
 import com.nan.stash.ui.theme.incomeColor
 import com.nan.stash.ui.theme.spendingColor
+import com.nan.stash.ui.util.StashHaptics
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -77,6 +77,8 @@ fun EditTransactionBottomSheet(
     var noteText by remember { mutableStateOf(transaction.note) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+
+    val isLoanTransaction = transaction.type == TransactionType.LEND || transaction.type == TransactionType.REPAYMENT
 
     val expenseTags = listOf("Food", "Transport", "Bills", "Shopping", "Fun", "Health")
     val incomeTags = listOf("Salary", "Gift", "Freelance", "Other")
@@ -125,52 +127,68 @@ fun EditTransactionBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Transaction Type Selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = currentType == TransactionType.EXPENSE,
-                    onClick = {
-                        currentType = TransactionType.EXPENSE
-                        if (selectedTag in incomeTags) selectedTag = "Food"
-                    },
-                    label = { Text("Expense") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.spendingColor.copy(alpha = 0.2f),
-                        selectedLabelColor = MaterialTheme.colorScheme.spendingColor
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
+            if (isLoanTransaction) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (transaction.type == TransactionType.LEND) "Lent Money Record" else "Loan Repayment Record",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    )
+                }
+            } else {
+                // Transaction Type Selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = currentType == TransactionType.EXPENSE,
+                        onClick = {
+                            currentType = TransactionType.EXPENSE
+                            if (selectedTag in incomeTags) selectedTag = "Food"
+                        },
+                        label = { Text("Expense") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.spendingColor.copy(alpha = 0.2f),
+                            selectedLabelColor = MaterialTheme.colorScheme.spendingColor
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
 
-                FilterChip(
-                    selected = currentType == TransactionType.INCOME,
-                    onClick = {
-                        currentType = TransactionType.INCOME
-                        if (selectedTag in expenseTags) selectedTag = "Salary"
-                    },
-                    label = { Text("Income") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.incomeColor.copy(alpha = 0.2f),
-                        selectedLabelColor = MaterialTheme.colorScheme.incomeColor
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
+                    FilterChip(
+                        selected = currentType == TransactionType.INCOME,
+                        onClick = {
+                            currentType = TransactionType.INCOME
+                            if (selectedTag in expenseTags) selectedTag = "Salary"
+                        },
+                        label = { Text("Income") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.incomeColor.copy(alpha = 0.2f),
+                            selectedLabelColor = MaterialTheme.colorScheme.incomeColor
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
 
-                FilterChip(
-                    selected = currentType == TransactionType.TRANSFER,
-                    onClick = {
-                        currentType = TransactionType.TRANSFER
-                        selectedTag = if (selectedPaymentMode == PaymentMode.ONLINE) "Online → Cash" else "Cash → Online"
-                    },
-                    label = { Text("Transfer") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
+                    FilterChip(
+                        selected = currentType == TransactionType.TRANSFER,
+                        onClick = {
+                            currentType = TransactionType.TRANSFER
+                            selectedTag = if (selectedPaymentMode == PaymentMode.ONLINE) "Online → Cash" else "Cash → Online"
+                        },
+                        label = { Text("Transfer") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -248,7 +266,7 @@ fun EditTransactionBottomSheet(
             }
 
             // Categories (for Income & Expense)
-            if (currentType != TransactionType.TRANSFER) {
+            if (currentType != TransactionType.TRANSFER && !isLoanTransaction) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
@@ -303,12 +321,14 @@ fun EditTransactionBottomSheet(
                 onClick = {
                     StashHaptics.buttonClick(haptic)
                     if (parsedAmount > 0.0) {
-                        val finalTag = if (currentType == TransactionType.TRANSFER) {
+                        val finalTag = if (isLoanTransaction) {
+                            transaction.tag
+                        } else if (currentType == TransactionType.TRANSFER) {
                             if (selectedPaymentMode == PaymentMode.ONLINE) "Online → Cash" else "Cash → Online"
                         } else selectedTag
 
                         val updated = transaction.copy(
-                            type = currentType,
+                            type = if (isLoanTransaction) transaction.type else currentType,
                             amount = parsedAmount,
                             tag = finalTag,
                             note = noteText,
@@ -354,7 +374,14 @@ fun EditTransactionBottomSheet(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Delete this transaction?") },
-            text = { Text("Are you sure you want to permanently delete this $currencySymbol$amountText record?") },
+            text = {
+                Text(
+                    if (isLoanTransaction)
+                        "This transaction is linked to Lent Money. Deleting it removes this ledger record but does not change the borrower's loan record."
+                    else
+                        "Are you sure you want to permanently delete this $currencySymbol$amountText record?"
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {

@@ -1,10 +1,10 @@
 package com.nan.stash.ui
 
 import android.app.Application
-import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.nan.stash.data.backup.BackupManager
 import com.nan.stash.data.local.AppDatabase
 import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.data.local.SettingsDataStore
@@ -12,8 +12,13 @@ import com.nan.stash.data.local.StashSettings
 import com.nan.stash.data.local.SubscriptionEntity
 import com.nan.stash.data.local.ThemeMode
 import com.nan.stash.data.local.TransactionEntity
+import com.nan.stash.data.model.CategorySummary
+import com.nan.stash.data.model.DayTrend
+import com.nan.stash.data.model.MonthComparison
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
+import com.nan.stash.ui.util.AnalyticsCalculator
+import com.nan.stash.ui.util.PdfStatementGenerator
 import com.nan.stash.ui.widget.StashWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,45 +27,12 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
-data class CategorySummary(
-    val tag: String,
-    val amount: Double,
-    val percentage: Float
-)
-
-data class DayTrend(
-    val dayLabel: String,
-    val fullDayName: String = "",
-    val isToday: Boolean = false,
-    val income: Double = 0.0,
-    val expense: Double = 0.0,
-    val net: Double = 0.0,
-    val amount: Double = 0.0,
-    val isPositive: Boolean = true,
-    val hasActivity: Boolean = false
-)
-
-data class MonthComparison(
-    val currentMonthLabel: String = "",
-    val previousMonthLabel: String = "",
-    val currentIncome: Double = 0.0,
-    val previousIncome: Double = 0.0,
-    val currentExpense: Double = 0.0,
-    val previousExpense: Double = 0.0,
-    val currentNet: Double = 0.0,
-    val previousNet: Double = 0.0,
-    val expenseDiffPercentage: Float = 0f,
-    val incomeDiffPercentage: Float = 0f,
-    val hasComparisonData: Boolean = false
-)
+// Backward compatibility typealiases
+typealias CategorySummary = com.nan.stash.data.model.CategorySummary
+typealias DayTrend = com.nan.stash.data.model.DayTrend
+typealias MonthComparison = com.nan.stash.data.model.MonthComparison
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -89,17 +61,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun isBiometricEnabledSync(): Boolean = settingsDataStore.isBiometricEnabledSync()
 
     val weeklyTrends: StateFlow<List<DayTrend>> = dao.getAllTransactions()
-        .map { calculateWeeklyTrends(it) }
+        .map { AnalyticsCalculator.calculateWeeklyTrends(it) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val categorySummaries: StateFlow<List<CategorySummary>> = dao.getAllTransactions()
-        .map { calculateCategorySummaries(it) }
+        .map { AnalyticsCalculator.calculateCategorySummaries(it) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val monthComparison: StateFlow<MonthComparison> = dao.getAllTransactions()
-        .map { calculateMonthComparison(it) }
+        .map { AnalyticsCalculator.calculateMonthComparison(it) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthComparison())
 
@@ -107,6 +79,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         StashWidgetProvider.updateAllWidgets(getApplication())
     }
 
+    // Loans Management
     fun lendMoney(
         personName: String,
         phoneNumber: String,
@@ -218,6 +191,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Transactions Management
     fun addTransaction(
         type: TransactionType,
         amount: Double,
@@ -374,336 +348,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Helper functions for UI
-    fun calculateCategorySummaries(transactions: List<TransactionEntity>): List<CategorySummary> {
-        val expenses = transactions.filter { it.type == TransactionType.EXPENSE }
-        val totalExpense = expenses.sumOf { it.amount }
-        if (totalExpense <= 0.0) return emptyList()
+    // Helper functions delegation
+    fun calculateCategorySummaries(transactions: List<TransactionEntity>): List<CategorySummary> =
+        AnalyticsCalculator.calculateCategorySummaries(transactions)
 
-        return expenses.groupBy { it.tag }
-            .map { (tag, list) ->
-                val sum = list.sumOf { it.amount }
-                CategorySummary(
-                    tag = tag,
-                    amount = sum,
-                    percentage = (sum / totalExpense * 100).toFloat()
-                )
-            }
-            .sortedByDescending { it.amount }
-    }
+    fun calculateWeeklyTrends(transactions: List<TransactionEntity>): List<DayTrend> =
+        AnalyticsCalculator.calculateWeeklyTrends(transactions)
 
-    fun calculateWeeklyTrends(transactions: List<TransactionEntity>): List<DayTrend> {
-        val days = listOf("M", "T", "W", "T", "F", "S", "S")
-        val fullDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-        val nowCal = Calendar.getInstance()
-        val currentDayIndex = (nowCal.get(Calendar.DAY_OF_WEEK) + 5) % 7 // Monday = 0 .. Sunday = 6
+    fun calculateMonthComparison(transactions: List<TransactionEntity>): MonthComparison =
+        AnalyticsCalculator.calculateMonthComparison(transactions)
 
-        // Compute start of Monday of the current week
-        val mondayCal = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            add(Calendar.DAY_OF_YEAR, -currentDayIndex)
-        }
+    // Export & Backup
+    fun exportToCsv(transactions: List<TransactionEntity>): File =
+        BackupManager.exportToCsv(getApplication(), transactions)
 
-        return (0..6).map { i ->
-            val dayCal = (mondayCal.clone() as Calendar).apply {
-                add(Calendar.DAY_OF_YEAR, i)
-            }
-            val startOfDay = dayCal.timeInMillis
-            val endOfDay = startOfDay + 24 * 60 * 60 * 1000L
+    fun exportToPdf(transactions: List<TransactionEntity>, currencySymbol: String): File =
+        PdfStatementGenerator.generateStatement(getApplication(), transactions, currencySymbol)
 
-            val dayTransactions = transactions.filter { it.timestamp in startOfDay until endOfDay }
-            val income = dayTransactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-            val expense = dayTransactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-            val net = income - expense
-            val hasActivity = dayTransactions.isNotEmpty()
-
-            DayTrend(
-                dayLabel = days[i],
-                fullDayName = fullDays[i],
-                isToday = (i == currentDayIndex),
-                income = income,
-                expense = expense,
-                net = net,
-                amount = Math.abs(net),
-                isPositive = net >= 0,
-                hasActivity = hasActivity
-            )
-        }
-    }
-
-    // Month-over-Month Comparison
-    fun calculateMonthComparison(transactions: List<TransactionEntity>): MonthComparison {
-        val now = Calendar.getInstance()
-        val curYear = now.get(Calendar.YEAR)
-        val curMonth = now.get(Calendar.MONTH) // 0-based
-
-        val curMonthStart = Calendar.getInstance().apply {
-            set(curYear, curMonth, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        val nextMonthStart = Calendar.getInstance().apply {
-            set(curYear, curMonth, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-            add(Calendar.MONTH, 1)
-        }.timeInMillis
-
-        val prevMonthCal = Calendar.getInstance().apply {
-            set(curYear, curMonth, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-            add(Calendar.MONTH, -1)
-        }
-        val prevMonthStart = prevMonthCal.timeInMillis
-
-        val curMonthName = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(curMonthStart))
-        val prevMonthName = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(prevMonthStart))
-
-        val curTx = transactions.filter { it.timestamp in curMonthStart until nextMonthStart }
-        val prevTx = transactions.filter { it.timestamp in prevMonthStart until curMonthStart }
-
-        val curIncome = curTx.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-        val curExpense = curTx.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-        val curNet = curIncome - curExpense
-
-        val prevIncome = prevTx.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-        val prevExpense = prevTx.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-        val prevNet = prevIncome - prevExpense
-
-        val expenseDiffPct = if (prevExpense > 0.0) {
-            (((curExpense - prevExpense) / prevExpense) * 100).toFloat()
-        } else if (curExpense > 0.0) {
-            100f
-        } else 0f
-
-        val incomeDiffPct = if (prevIncome > 0.0) {
-            (((curIncome - prevIncome) / prevIncome) * 100).toFloat()
-        } else if (curIncome > 0.0) {
-            100f
-        } else 0f
-
-        return MonthComparison(
-            currentMonthLabel = curMonthName,
-            previousMonthLabel = prevMonthName,
-            currentIncome = curIncome,
-            previousIncome = prevIncome,
-            currentExpense = curExpense,
-            previousExpense = prevExpense,
-            currentNet = curNet,
-            previousNet = prevNet,
-            expenseDiffPercentage = expenseDiffPct,
-            incomeDiffPercentage = incomeDiffPct,
-            hasComparisonData = curTx.isNotEmpty() || prevTx.isNotEmpty()
-        )
-    }
-
-    // Export to CSV
-    fun exportToCsv(transactions: List<TransactionEntity>): File {
-        val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val filename = "stash_transactions_$timestampStr.csv"
-
-        val sb = StringBuilder()
-        sb.append("ID,Type,Amount,Category,PaymentMode,Note,Date,Time\n")
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-
-        for (t in transactions) {
-            val d = Date(t.timestamp)
-            val cleanNote = t.note.replace(",", " ").replace("\n", " ")
-            sb.append("${t.id},${t.type.name},${String.format(Locale.US, "%.2f", t.amount)},\"${t.tag}\",${t.paymentMode.name},\"$cleanNote\",${dateFormat.format(d)},${timeFormat.format(d)}\n")
-        }
-
-        return saveFileToStorage(filename, sb.toString())
-    }
-
-    // Export to PDF Statement
-    fun exportToPdf(transactions: List<TransactionEntity>, currencySymbol: String): File {
-        return com.nan.stash.ui.util.PdfStatementGenerator.generateStatement(
-            getApplication(),
-            transactions,
-            currencySymbol
-        )
-    }
-
-    // Local Backup to JSON (Includes transactions, loans, and subscriptions)
     fun createBackupJson(
         transactions: List<TransactionEntity> = this.transactions.value,
         loans: List<LoanEntity> = this.loans.value,
         subscriptions: List<SubscriptionEntity> = this.subscriptions.value
-    ): File {
-        val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val filename = "stash_backup_$timestampStr.json"
+    ): File = BackupManager.createBackupJson(getApplication(), transactions, loans, subscriptions)
 
-        val root = JSONObject()
-        root.put("version", 3)
-        root.put("appName", "Stash")
-        root.put("timestamp", System.currentTimeMillis())
-
-        val txArray = JSONArray()
-        for (t in transactions) {
-            val obj = JSONObject()
-            obj.put("id", t.id)
-            obj.put("type", t.type.name)
-            obj.put("amount", t.amount)
-            obj.put("tag", t.tag)
-            obj.put("note", t.note)
-            obj.put("timestamp", t.timestamp)
-            obj.put("paymentMode", t.paymentMode.name)
-            txArray.put(obj)
-        }
-        root.put("transactions", txArray)
-
-        val loanArray = JSONArray()
-        for (l in loans) {
-            val obj = JSONObject()
-            obj.put("id", l.id)
-            obj.put("personName", l.personName)
-            obj.put("phoneNumber", l.phoneNumber)
-            obj.put("totalAmount", l.totalAmount)
-            obj.put("remainingAmount", l.remainingAmount)
-            obj.put("reason", l.reason)
-            obj.put("lendDate", l.lendDate)
-            if (l.dueDate != null) {
-                obj.put("dueDate", l.dueDate)
-            }
-            obj.put("initialPaymentMode", l.initialPaymentMode.name)
-            obj.put("isSettled", l.isSettled)
-            loanArray.put(obj)
-        }
-        root.put("loans", loanArray)
-
-        val subArray = JSONArray()
-        for (s in subscriptions) {
-            val obj = JSONObject()
-            obj.put("id", s.id)
-            obj.put("name", s.name)
-            obj.put("amount", s.amount)
-            obj.put("category", s.category)
-            obj.put("paymentMode", s.paymentMode.name)
-            obj.put("billingCycle", s.billingCycle)
-            obj.put("dueDay", s.dueDay)
-            obj.put("startDate", s.startDate)
-            obj.put("isActive", s.isActive)
-            if (s.lastPaidDate != null) {
-                obj.put("lastPaidDate", s.lastPaidDate)
-            }
-            subArray.put(obj)
-        }
-        root.put("subscriptions", subArray)
-
-        return saveFileToStorage(filename, root.toString(2))
-    }
-
-    // Restore from JSON (Restores transactions, loans, and subscriptions atomically)
     fun restoreFromJson(jsonString: String, onResult: (Boolean, Int) -> Unit) {
         viewModelScope.launch {
             try {
-                val root = JSONObject(jsonString)
-                val txList = mutableListOf<TransactionEntity>()
-                if (root.has("transactions")) {
-                    val txArray = root.getJSONArray("transactions")
-                    for (i in 0 until txArray.length()) {
-                        val obj = txArray.getJSONObject(i)
-                        val type = try { TransactionType.valueOf(obj.getString("type")) } catch (_: Exception) { TransactionType.EXPENSE }
-                        val paymentMode = try { PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE")) } catch (_: Exception) { PaymentMode.ONLINE }
-                        txList.add(
-                            TransactionEntity(
-                                id = 0,
-                                type = type,
-                                amount = obj.getDouble("amount"),
-                                tag = obj.getString("tag"),
-                                note = obj.optString("note", ""),
-                                timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
-                                paymentMode = paymentMode
-                            )
-                        )
-                    }
-                }
-
-                val loanList = mutableListOf<LoanEntity>()
-                if (root.has("loans")) {
-                    val loanArray = root.getJSONArray("loans")
-                    for (i in 0 until loanArray.length()) {
-                        val obj = loanArray.getJSONObject(i)
-                        val paymentMode = try {
-                            PaymentMode.valueOf(obj.optString("initialPaymentMode", "CASH"))
-                        } catch (_: Exception) {
-                            PaymentMode.CASH
-                        }
-                        val dueDate = if (obj.has("dueDate") && !obj.isNull("dueDate")) obj.getLong("dueDate") else null
-                        loanList.add(
-                            LoanEntity(
-                                id = 0,
-                                personName = obj.getString("personName"),
-                                phoneNumber = obj.optString("phoneNumber", ""),
-                                totalAmount = obj.getDouble("totalAmount"),
-                                remainingAmount = obj.getDouble("remainingAmount"),
-                                reason = obj.optString("reason", ""),
-                                lendDate = obj.optLong("lendDate", System.currentTimeMillis()),
-                                dueDate = dueDate,
-                                initialPaymentMode = paymentMode,
-                                isSettled = obj.optBoolean("isSettled", false)
-                            )
-                        )
-                    }
-                }
-
-                val subList = mutableListOf<SubscriptionEntity>()
-                if (root.has("subscriptions")) {
-                    val subArray = root.getJSONArray("subscriptions")
-                    for (i in 0 until subArray.length()) {
-                        val obj = subArray.getJSONObject(i)
-                        val paymentMode = try {
-                            PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE"))
-                        } catch (_: Exception) {
-                            PaymentMode.ONLINE
-                        }
-                        val lastPaid = if (obj.has("lastPaidDate") && !obj.isNull("lastPaidDate")) obj.getLong("lastPaidDate") else null
-                        subList.add(
-                            SubscriptionEntity(
-                                id = 0,
-                                name = obj.getString("name"),
-                                amount = obj.getDouble("amount"),
-                                category = obj.optString("category", "Bills"),
-                                paymentMode = paymentMode,
-                                billingCycle = obj.optString("billingCycle", "MONTHLY"),
-                                dueDay = obj.optInt("dueDay", 1),
-                                startDate = obj.optLong("startDate", System.currentTimeMillis()),
-                                isActive = obj.optBoolean("isActive", true),
-                                lastPaidDate = lastPaid
-                            )
-                        )
-                    }
-                }
-
+                val restored = BackupManager.parseBackupJson(jsonString)
                 db.withTransaction {
-                    if (txList.isNotEmpty()) {
-                        dao.insertAll(txList)
-                    }
-                    if (loanList.isNotEmpty()) {
-                        loanDao.insertAll(loanList)
-                    }
-                    if (subList.isNotEmpty()) {
-                        subscriptionDao.insertAll(subList)
-                    }
+                    dao.clearAllTransactions()
+                    loanDao.clearAllLoans()
+                    subscriptionDao.clearAllSubscriptions()
+                    if (restored.transactions.isNotEmpty()) dao.insertAll(restored.transactions)
+                    if (restored.loans.isNotEmpty()) loanDao.insertAll(restored.loans)
+                    if (restored.subscriptions.isNotEmpty()) subscriptionDao.insertAll(restored.subscriptions)
                 }
                 notifyWidgetUpdate()
-                val totalRestored = txList.size + loanList.size + subList.size
+                val totalRestored = restored.transactions.size + restored.loans.size + restored.subscriptions.size
                 onResult(true, totalRestored)
             } catch (e: Exception) {
                 onResult(false, 0)
             }
         }
-    }
-
-    private fun saveFileToStorage(filename: String, content: String): File {
-        val context = getApplication<Application>()
-        val targetDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-        if (!targetDir.exists()) targetDir.mkdirs()
-        val file = File(targetDir, filename)
-        file.writeText(content)
-        return file
     }
 }
