@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.nan.stash.ui.util.StashHaptics
 import com.nan.stash.ui.theme.incomeColor
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -71,6 +73,7 @@ fun AddMoneyBottomSheet(
     var selectedPaymentMode by remember { mutableStateOf(PaymentMode.ONLINE) }
     var selectedTimestamp by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val focusRequester = remember { FocusRequester() }
+    val haptic = LocalHapticFeedback.current
 
     val sources = listOf("Salary", "Gift", "Freelance", "Other")
 
@@ -122,6 +125,7 @@ fun AddMoneyBottomSheet(
                 onValueChange = { input ->
                     val clean = input.replace(',', '.')
                     if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                        StashHaptics.keyTap(haptic)
                         amountString = clean
                     }
                 },
@@ -168,7 +172,7 @@ fun AddMoneyBottomSheet(
             ) {
                 FilterChip(
                     selected = selectedPaymentMode == PaymentMode.ONLINE,
-                    onClick = { selectedPaymentMode = PaymentMode.ONLINE },
+                    onClick = { StashHaptics.keyTap(haptic); selectedPaymentMode = PaymentMode.ONLINE },
                     label = { Text("Online Money", fontWeight = FontWeight.SemiBold) },
                     leadingIcon = {
                         Icon(
@@ -188,7 +192,7 @@ fun AddMoneyBottomSheet(
 
                 FilterChip(
                     selected = selectedPaymentMode == PaymentMode.CASH,
-                    onClick = { selectedPaymentMode = PaymentMode.CASH },
+                    onClick = { StashHaptics.keyTap(haptic); selectedPaymentMode = PaymentMode.CASH },
                     label = { Text("Cash Available", fontWeight = FontWeight.SemiBold) },
                     leadingIcon = {
                         Icon(
@@ -228,7 +232,7 @@ fun AddMoneyBottomSheet(
                     val isSelected = selectedSource == source
                     FilterChip(
                         selected = isSelected,
-                        onClick = { selectedSource = source },
+                        onClick = { StashHaptics.keyTap(haptic); selectedSource = source },
                         label = { Text(source, fontWeight = FontWeight.SemiBold) },
                         shape = CircleShape,
                         colors = FilterChipDefaults.filterChipColors(
@@ -274,6 +278,7 @@ fun AddMoneyBottomSheet(
             // Save Pill Button
             Button(
                 onClick = {
+                    StashHaptics.buttonClick(haptic)
                     if (parsedAmount > 0.0) {
                         onSave(TransactionType.INCOME, parsedAmount, selectedSource, "", selectedTimestamp, selectedPaymentMode)
                         onDismiss()

@@ -51,6 +51,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.nan.stash.ui.util.StashHaptics
 import com.nan.stash.data.model.PaymentMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +69,7 @@ fun TransferMoneyBottomSheet(
     var fromMode by remember { mutableStateOf(PaymentMode.ONLINE) }
     var noteText by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(Unit) {
         delay(200)
@@ -138,7 +141,7 @@ fun TransferMoneyBottomSheet(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
-                        .clickable { fromMode = PaymentMode.ONLINE },
+                        .clickable { StashHaptics.keyTap(haptic); fromMode = PaymentMode.ONLINE },
                     colors = CardDefaults.cardColors(
                         containerColor = if (isOnlineToCash) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer
                     ),
@@ -176,7 +179,7 @@ fun TransferMoneyBottomSheet(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
-                        .clickable { fromMode = PaymentMode.CASH },
+                        .clickable { StashHaptics.keyTap(haptic); fromMode = PaymentMode.CASH },
                     colors = CardDefaults.cardColors(
                         containerColor = if (isCashToOnline) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer
                     ),
@@ -217,6 +220,7 @@ fun TransferMoneyBottomSheet(
                 onValueChange = { input ->
                     val clean = input.replace(',', '.')
                     if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                        StashHaptics.keyTap(haptic)
                         amountString = clean
                     }
                 },
@@ -261,6 +265,7 @@ fun TransferMoneyBottomSheet(
             // Confirm Button
             Button(
                 onClick = {
+                    StashHaptics.buttonClick(haptic)
                     if (parsedAmount > 0.0) {
                         val defaultNote = if (fromMode == PaymentMode.ONLINE) "ATM Withdrawal" else "Bank Deposit"
                         val finalNote = if (noteText.isNotBlank()) noteText else defaultNote

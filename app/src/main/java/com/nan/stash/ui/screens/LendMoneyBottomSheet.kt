@@ -46,6 +46,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.nan.stash.ui.util.StashHaptics
 import com.nan.stash.data.model.PaymentMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,6 +66,7 @@ fun LendMoneyBottomSheet(
 
     // Quick due date: 0 = none, 7 = 1 week, 14 = 2 weeks, 30 = 1 month
     var dueDaysOption by remember { mutableIntStateOf(0) }
+    val haptic = LocalHapticFeedback.current
 
     val parsedAmount = amountString.toDoubleOrNull() ?: 0.0
 
@@ -130,6 +133,7 @@ fun LendMoneyBottomSheet(
                 onValueChange = { input ->
                     val clean = input.replace(',', '.')
                     if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                        StashHaptics.keyTap(haptic)
                         amountString = clean
                     }
                 },
@@ -211,7 +215,7 @@ fun LendMoneyBottomSheet(
             ) {
                 FilterChip(
                     selected = selectedPaymentMode == PaymentMode.CASH,
-                    onClick = { selectedPaymentMode = PaymentMode.CASH },
+                    onClick = { StashHaptics.keyTap(haptic); selectedPaymentMode = PaymentMode.CASH },
                     label = { Text("Cash Available") },
                     leadingIcon = {
                         Icon(imageVector = Icons.Rounded.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -221,7 +225,7 @@ fun LendMoneyBottomSheet(
 
                 FilterChip(
                     selected = selectedPaymentMode == PaymentMode.ONLINE,
-                    onClick = { selectedPaymentMode = PaymentMode.ONLINE },
+                    onClick = { StashHaptics.keyTap(haptic); selectedPaymentMode = PaymentMode.ONLINE },
                     label = { Text("Online Money") },
                     leadingIcon = {
                         Icon(imageVector = Icons.Rounded.AccountBalance, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -255,7 +259,7 @@ fun LendMoneyBottomSheet(
                 ).forEach { (days, label) ->
                     FilterChip(
                         selected = dueDaysOption == days,
-                        onClick = { dueDaysOption = days },
+                        onClick = { StashHaptics.keyTap(haptic); dueDaysOption = days },
                         label = { Text(label) },
                         leadingIcon = if (dueDaysOption == days && days > 0) {
                             { Icon(imageVector = Icons.Rounded.CalendarToday, contentDescription = null, modifier = Modifier.size(14.dp)) }
@@ -271,6 +275,7 @@ fun LendMoneyBottomSheet(
             val canSubmit = parsedAmount > 0.0 && personName.isNotBlank()
             Button(
                 onClick = {
+                    StashHaptics.buttonClick(haptic)
                     if (canSubmit) {
                         val dueDate = if (dueDaysOption > 0) {
                             System.currentTimeMillis() + (dueDaysOption * 24L * 60 * 60 * 1000)

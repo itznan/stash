@@ -89,6 +89,10 @@ import com.nan.stash.ui.screens.HomeScreen
 import com.nan.stash.ui.screens.LendMoneyBottomSheet
 import com.nan.stash.ui.screens.LentMoneyManagerSheet
 import com.nan.stash.ui.screens.SettingsScreen
+import androidx.compose.material.icons.rounded.EventRepeat
+import com.nan.stash.data.local.SubscriptionEntity
+import com.nan.stash.ui.screens.SubscriptionManagerSheet
+import com.nan.stash.ui.widget.StashWidgetProvider
 import com.nan.stash.ui.screens.SpendMoneyBottomSheet
 import com.nan.stash.ui.screens.TagsScreen
 import com.nan.stash.ui.screens.TransferMoneyBottomSheet
@@ -100,6 +104,13 @@ import com.nan.stash.ui.theme.spendingColor
 class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private var pendingAction by mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingAction = intent.action
+    }
     private var isAppUnlocked by mutableStateOf(false)
     private var isPromptShowing = false
     private var isLaunchingPicker = false
@@ -214,6 +225,10 @@ class MainActivity : FragmentActivity() {
 
         super.onCreate(savedInstanceState)
 
+        if (pendingAction == null && intent?.action != null) {
+            pendingAction = intent.action
+        }
+
         // Initialize lock state synchronously from disk
         val isBioEnabled = viewModel.isBiometricEnabledSync()
         isAppUnlocked = !isBioEnabled
@@ -231,6 +246,7 @@ class MainActivity : FragmentActivity() {
             val settings by viewModel.settings.collectAsState()
             val transactions by viewModel.transactions.collectAsState()
             val loans by viewModel.loans.collectAsState()
+            val subscriptions by viewModel.subscriptions.collectAsState()
 
             val isDarkTheme = when (settings.themeMode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -257,7 +273,32 @@ class MainActivity : FragmentActivity() {
                 var showTransferSheet by remember { mutableStateOf(false) }
                 var showLendSheet by remember { mutableStateOf(false) }
                 var showLentManagerSheet by remember { mutableStateOf(false) }
+                var showSubscriptionSheet by remember { mutableStateOf(false) }
                 var editingTransaction by remember { mutableStateOf<TransactionEntity?>(null) }
+
+                LaunchedEffect(pendingAction) {
+                    when (pendingAction) {
+                        StashWidgetProvider.ACTION_ADD_INCOME -> {
+                            showAddSheet = true
+                            showSpendSheet = false
+                            showTransferSheet = false
+                            showFabMenu = false
+                        }
+                        StashWidgetProvider.ACTION_ADD_EXPENSE -> {
+                            showSpendSheet = true
+                            showAddSheet = false
+                            showTransferSheet = false
+                            showFabMenu = false
+                        }
+                        StashWidgetProvider.ACTION_TRANSFER -> {
+                            showTransferSheet = true
+                            showAddSheet = false
+                            showSpendSheet = false
+                            showFabMenu = false
+                        }
+                    }
+                    pendingAction = null
+                }
 
                 val promptBiometricAction = {
                     promptBiometric()
@@ -335,6 +376,23 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
+                val onExportPdf: () -> Unit = {
+                    try {
+                        val file = viewModel.exportToPdf(transactions, settings.currencySymbol)
+                        Toast.makeText(this@MainActivity, "PDF generated: ${file.name}", Toast.LENGTH_LONG).show()
+                        val uri = FileProvider.getUriForFile(this@MainActivity, "com.nan.stash.provider", file)
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/pdf"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        isLaunchingPicker = true
+                        startActivity(Intent.createChooser(shareIntent, "Share Stash PDF Statement"))
+                    } catch (e: Exception) {
+                        Toast.makeText(this@MainActivity, "PDF export failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
                 val onExportCsv: () -> Unit = {
                     try {
                         val file = viewModel.exportToCsv(transactions)
@@ -354,7 +412,7 @@ class MainActivity : FragmentActivity() {
 
                 val onBackupJson: () -> Unit = {
                     try {
-                        val file = viewModel.createBackupJson(transactions, loans)
+                        val file = viewModel.createBackupJson(transactions, loans, subscriptions)
                         Toast.makeText(this@MainActivity, "Backup saved: ${file.name}", Toast.LENGTH_LONG).show()
                         val uri = FileProvider.getUriForFile(this@MainActivity, "com.nan.stash.provider", file)
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -504,7 +562,9 @@ class MainActivity : FragmentActivity() {
                                     },
                                     onTransactionClick = { editingTransaction = it },
                                     loans = loans,
-                                    onLentCardClick = { showLentManagerSheet = true }
+                                    onLentCardClick = { showLentManagerSheet = true },
+                                    subscriptions = subscriptions,
+                                    onSubscriptionClick = { showSubscriptionSheet = true }
                                 )
                                 1 -> HistoryScreen(
                                     innerPadding = innerPadding,
@@ -531,6 +591,7 @@ class MainActivity : FragmentActivity() {
                                     onCurrencyChange = { viewModel.setCurrencySymbol(it) },
                                     onBiometricToggle = onBiometricToggle,
                                     onExportCsv = onExportCsv,
+                                    onExportPdf = onExportPdf,
                                     onBackupJson = onBackupJson,
                                     onRestoreJson = {
                                         try {
@@ -714,6 +775,41 @@ class MainActivity : FragmentActivity() {
                                         color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
+
+                                // Subscriptions Option
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                        .clickable {
+                                            showFabMenu = false
+                                            showSubscriptionSheet = true
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.EventRepeat,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Subscriptions",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     }
@@ -779,6 +875,24 @@ class MainActivity : FragmentActivity() {
                             onDismiss = { showTransferSheet = false },
                             onConfirmTransfer = { amount, fromMode, note ->
                                 viewModel.addTransfer(amount, fromMode, note)
+                            }
+                        )
+                    }
+
+                    // Subscription Manager Sheet
+                    if (showSubscriptionSheet) {
+                        SubscriptionManagerSheet(
+                            subscriptions = subscriptions,
+                            currencySymbol = settings.currencySymbol,
+                            onDismiss = { showSubscriptionSheet = false },
+                            onAddSubscription = { name, amount, category, mode, dueDay ->
+                                viewModel.addSubscription(name, amount, category, mode, dueDay)
+                            },
+                            onDeleteSubscription = { sub ->
+                                viewModel.deleteSubscription(sub)
+                            },
+                            onLogPayment = { sub ->
+                                viewModel.logSubscriptionPayment(sub)
                             }
                         )
                     }

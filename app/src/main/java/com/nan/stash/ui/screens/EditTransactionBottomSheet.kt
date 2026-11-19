@@ -47,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.nan.stash.ui.util.StashHaptics
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
@@ -74,6 +76,7 @@ fun EditTransactionBottomSheet(
     var selectedPaymentMode by remember { mutableStateOf(transaction.paymentMode) }
     var noteText by remember { mutableStateOf(transaction.note) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     val expenseTags = listOf("Food", "Transport", "Bills", "Shopping", "Fun", "Health")
     val incomeTags = listOf("Salary", "Gift", "Freelance", "Other")
@@ -178,6 +181,7 @@ fun EditTransactionBottomSheet(
                 onValueChange = { input ->
                     val clean = input.replace(',', '.')
                     if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                        StashHaptics.keyTap(haptic)
                         amountText = clean
                     }
                 },
@@ -266,7 +270,7 @@ fun EditTransactionBottomSheet(
                     availableTags.forEach { tag ->
                         FilterChip(
                             selected = selectedTag.equals(tag, ignoreCase = true),
-                            onClick = { selectedTag = tag },
+                            onClick = { StashHaptics.keyTap(haptic); selectedTag = tag },
                             label = { Text(tag) },
                             leadingIcon = {
                                 Icon(
@@ -297,6 +301,7 @@ fun EditTransactionBottomSheet(
             // Action Buttons
             Button(
                 onClick = {
+                    StashHaptics.buttonClick(haptic)
                     if (parsedAmount > 0.0) {
                         val finalTag = if (currentType == TransactionType.TRANSFER) {
                             if (selectedPaymentMode == PaymentMode.ONLINE) "Online → Cash" else "Cash → Online"

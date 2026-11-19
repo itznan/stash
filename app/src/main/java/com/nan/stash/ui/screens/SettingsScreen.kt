@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.TableChart
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -63,6 +64,7 @@ fun SettingsScreen(
     onCurrencyChange: (String) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
     onExportCsv: () -> Unit,
+    onExportPdf: () -> Unit,
     onBackupJson: () -> Unit,
     onRestoreJson: () -> Unit,
     onClearAllData: () -> Unit,
@@ -218,6 +220,113 @@ fun SettingsScreen(
                     SettingsCardHeader(icon = Icons.Rounded.SettingsBackupRestore, title = "BACKUP & EXPORT")
 
                     Spacer(modifier = Modifier.height(14.dp))
+
+                    // Export to PDF
+
+
+                    Row(
+
+
+                        modifier = Modifier
+
+
+                            .fillMaxWidth()
+
+
+                            .clickable { onExportPdf() }
+
+
+                            .padding(vertical = 8.dp),
+
+
+                        verticalAlignment = Alignment.CenterVertically,
+
+
+                        horizontalArrangement = Arrangement.SpaceBetween
+
+
+                    ) {
+
+
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+
+
+                            Icon(
+
+
+                                imageVector = Icons.Rounded.PictureAsPdf,
+
+
+                                contentDescription = null,
+
+
+                                tint = MaterialTheme.colorScheme.error,
+
+
+                                modifier = Modifier.size(24.dp)
+
+
+                            )
+
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+
+                            Column {
+
+
+                                Text(
+
+
+                                    text = "Printable PDF Statement",
+
+
+                                    style = MaterialTheme.typography.bodyMedium,
+
+
+                                    fontWeight = FontWeight.SemiBold
+
+
+                                )
+
+
+                                Text(
+
+
+                                    text = "Generate formatted PDF for sharing or printing",
+
+
+                                    style = MaterialTheme.typography.bodySmall,
+
+
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+
+
+                                )
+
+
+                            }
+
+
+                        }
+
+
+                    }
+
+
+
+                    HorizontalDivider(
+
+
+                        modifier = Modifier.padding(vertical = 4.dp),
+
+
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+
+
+                    )
+
+
 
                     // Export to CSV
                     Row(

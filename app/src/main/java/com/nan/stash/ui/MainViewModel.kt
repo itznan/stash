@@ -9,10 +9,12 @@ import com.nan.stash.data.local.AppDatabase
 import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.data.local.SettingsDataStore
 import com.nan.stash.data.local.StashSettings
+import com.nan.stash.data.local.SubscriptionEntity
 import com.nan.stash.data.local.ThemeMode
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
+import com.nan.stash.ui.widget.StashWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -65,12 +67,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val dao = db.transactionDao()
     private val loanDao = db.loanDao()
+    private val subscriptionDao = db.subscriptionDao()
     private val settingsDataStore = SettingsDataStore(application)
 
     val transactions: StateFlow<List<TransactionEntity>> = dao.getAllTransactions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val loans: StateFlow<List<LoanEntity>> = loanDao.getAllLoans()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val subscriptions: StateFlow<List<SubscriptionEntity>> = subscriptionDao.getAllSubscriptions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val settings: StateFlow<StashSettings> = settingsDataStore.settingsFlow
@@ -96,6 +102,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .map { calculateMonthComparison(it) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthComparison())
+
+    private fun notifyWidgetUpdate() {
+        StashWidgetProvider.updateAllWidgets(getApplication())
+    }
 
     fun lendMoney(
         personName: String,
@@ -133,6 +143,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             }
+            notifyWidgetUpdate()
         }
     }
 
@@ -165,6 +176,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             }
+            notifyWidgetUpdate()
         }
     }
 
@@ -196,6 +208,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             }
+            notifyWidgetUpdate()
         }
     }
 
@@ -225,6 +238,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     paymentMode = paymentMode
                 )
             )
+            notifyWidgetUpdate()
         }
     }
 
@@ -247,6 +261,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     paymentMode = fromMode
                 )
             )
+            notifyWidgetUpdate()
         }
     }
 
@@ -254,12 +269,73 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (transaction.amount <= 0.0) return
         viewModelScope.launch {
             dao.updateTransaction(transaction)
+            notifyWidgetUpdate()
         }
     }
 
     fun deleteTransaction(transaction: TransactionEntity) {
         viewModelScope.launch {
             dao.deleteTransaction(transaction)
+            notifyWidgetUpdate()
+        }
+    }
+
+    // Subscriptions Management
+    fun addSubscription(
+        name: String,
+        amount: Double,
+        category: String,
+        paymentMode: PaymentMode,
+        dueDay: Int,
+        billingCycle: String = "MONTHLY"
+    ) {
+        if (name.isBlank() || amount <= 0.0) return
+        viewModelScope.launch {
+            subscriptionDao.insertSubscription(
+                SubscriptionEntity(
+                    name = name.trim(),
+                    amount = amount,
+                    category = category.trim(),
+                    paymentMode = paymentMode,
+                    dueDay = dueDay.coerceIn(1, 31),
+                    billingCycle = billingCycle
+                )
+            )
+        }
+    }
+
+    fun updateSubscription(subscription: SubscriptionEntity) {
+        viewModelScope.launch {
+            subscriptionDao.updateSubscription(subscription)
+        }
+    }
+
+    fun deleteSubscription(subscription: SubscriptionEntity) {
+        viewModelScope.launch {
+            subscriptionDao.deleteSubscription(subscription)
+        }
+    }
+
+    fun logSubscriptionPayment(
+        subscription: SubscriptionEntity,
+        paymentMode: PaymentMode = subscription.paymentMode
+    ) {
+        viewModelScope.launch {
+            db.withTransaction {
+                val now = System.currentTimeMillis()
+                subscriptionDao.updateSubscription(subscription.copy(lastPaidDate = now))
+                dao.insertTransaction(
+                    TransactionEntity(
+                        type = TransactionType.EXPENSE,
+                        amount = subscription.amount,
+                        tag = subscription.category,
+                        note = "Subscription: ${subscription.name}",
+                        timestamp = now,
+                        paymentMode = paymentMode
+                    )
+                )
+            }
+            notifyWidgetUpdate()
         }
     }
 
@@ -268,7 +344,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             db.withTransaction {
                 dao.clearAllTransactions()
                 loanDao.clearAllLoans()
+                subscriptionDao.clearAllSubscriptions()
             }
+            notifyWidgetUpdate()
         }
     }
 
@@ -440,16 +518,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return saveFileToStorage(filename, sb.toString())
     }
 
-    // Local Backup to JSON (Includes both transactions and loans)
+    // Export to PDF Statement
+    fun exportToPdf(transactions: List<TransactionEntity>, currencySymbol: String): File {
+        return com.nan.stash.ui.util.PdfStatementGenerator.generateStatement(
+            getApplication(),
+            transactions,
+            currencySymbol
+        )
+    }
+
+    // Local Backup to JSON (Includes transactions, loans, and subscriptions)
     fun createBackupJson(
         transactions: List<TransactionEntity> = this.transactions.value,
-        loans: List<LoanEntity> = this.loans.value
+        loans: List<LoanEntity> = this.loans.value,
+        subscriptions: List<SubscriptionEntity> = this.subscriptions.value
     ): File {
         val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val filename = "stash_backup_$timestampStr.json"
 
         val root = JSONObject()
-        root.put("version", 2)
+        root.put("version", 3)
         root.put("appName", "Stash")
         root.put("timestamp", System.currentTimeMillis())
 
@@ -486,10 +574,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         root.put("loans", loanArray)
 
+        val subArray = JSONArray()
+        for (s in subscriptions) {
+            val obj = JSONObject()
+            obj.put("id", s.id)
+            obj.put("name", s.name)
+            obj.put("amount", s.amount)
+            obj.put("category", s.category)
+            obj.put("paymentMode", s.paymentMode.name)
+            obj.put("billingCycle", s.billingCycle)
+            obj.put("dueDay", s.dueDay)
+            obj.put("startDate", s.startDate)
+            obj.put("isActive", s.isActive)
+            if (s.lastPaidDate != null) {
+                obj.put("lastPaidDate", s.lastPaidDate)
+            }
+            subArray.put(obj)
+        }
+        root.put("subscriptions", subArray)
+
         return saveFileToStorage(filename, root.toString(2))
     }
 
-    // Restore from JSON (Restores transactions and loans atomically)
+    // Restore from JSON (Restores transactions, loans, and subscriptions atomically)
     fun restoreFromJson(jsonString: String, onResult: (Boolean, Int) -> Unit) {
         viewModelScope.launch {
             try {
@@ -543,6 +650,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
+                val subList = mutableListOf<SubscriptionEntity>()
+                if (root.has("subscriptions")) {
+                    val subArray = root.getJSONArray("subscriptions")
+                    for (i in 0 until subArray.length()) {
+                        val obj = subArray.getJSONObject(i)
+                        val paymentMode = try {
+                            PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE"))
+                        } catch (_: Exception) {
+                            PaymentMode.ONLINE
+                        }
+                        val lastPaid = if (obj.has("lastPaidDate") && !obj.isNull("lastPaidDate")) obj.getLong("lastPaidDate") else null
+                        subList.add(
+                            SubscriptionEntity(
+                                id = 0,
+                                name = obj.getString("name"),
+                                amount = obj.getDouble("amount"),
+                                category = obj.optString("category", "Bills"),
+                                paymentMode = paymentMode,
+                                billingCycle = obj.optString("billingCycle", "MONTHLY"),
+                                dueDay = obj.optInt("dueDay", 1),
+                                startDate = obj.optLong("startDate", System.currentTimeMillis()),
+                                isActive = obj.optBoolean("isActive", true),
+                                lastPaidDate = lastPaid
+                            )
+                        )
+                    }
+                }
+
                 db.withTransaction {
                     if (txList.isNotEmpty()) {
                         dao.insertAll(txList)
@@ -550,8 +685,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (loanList.isNotEmpty()) {
                         loanDao.insertAll(loanList)
                     }
+                    if (subList.isNotEmpty()) {
+                        subscriptionDao.insertAll(subList)
+                    }
                 }
-                val totalRestored = txList.size + loanList.size
+                notifyWidgetUpdate()
+                val totalRestored = txList.size + loanList.size + subList.size
                 onResult(true, totalRestored)
             } catch (e: Exception) {
                 onResult(false, 0)

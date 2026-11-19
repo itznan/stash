@@ -42,6 +42,25 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `subscriptions` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `amount` REAL NOT NULL,
+                `category` TEXT NOT NULL,
+                `paymentMode` TEXT NOT NULL DEFAULT 'ONLINE',
+                `billingCycle` TEXT NOT NULL DEFAULT 'MONTHLY',
+                `dueDay` INTEGER NOT NULL DEFAULT 1,
+                `startDate` INTEGER NOT NULL,
+                `isActive` INTEGER NOT NULL DEFAULT 1,
+                `lastPaidDate` INTEGER
+            )
+        """.trimIndent())
+    }
+}
+
 class Converters {
     @TypeConverter
     fun fromTransactionType(value: TransactionType): String = value.name
@@ -64,11 +83,12 @@ class Converters {
     }
 }
 
-@Database(entities = [TransactionEntity::class, LoanEntity::class], version = 4, exportSchema = true)
+@Database(entities = [TransactionEntity::class, LoanEntity::class, SubscriptionEntity::class], version = 5, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun loanDao(): LoanDao
+    abstract fun subscriptionDao(): SubscriptionDao
 
     companion object {
         @Volatile
@@ -77,7 +97,8 @@ abstract class AppDatabase : RoomDatabase() {
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
-            MIGRATION_3_4
+            MIGRATION_3_4,
+            MIGRATION_4_5
         )
 
         fun getDatabase(context: Context): AppDatabase {
