@@ -10,14 +10,14 @@ RepoType: git
 Repo: https://github.com/itznan/stash.git
 
 Builds:
-  - versionName: 1.0.2
-    versionCode: 3
-    commit: 47a3c5c03e2a8e0d330cf50476fa5c66872614c2
+  - versionName: 1.0.3
+    versionCode: 4
+    commit: f697907fc5908322c014ff991441b97e959cf568
     subdir: app
     gradle:
       - yes
 
 AutoUpdateMode: Version v%v
 UpdateCheckMode: Tags
-CurrentVersion: 1.0.2
-CurrentVersionCode: 3
+CurrentVersion: 1.0.3
+CurrentVersionCode: 4
