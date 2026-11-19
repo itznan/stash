@@ -44,9 +44,9 @@ import java.util.Locale
 fun HistoryItemCard(
     transaction: TransactionEntity,
     currencySymbol: String,
-    onClick: () -> Unit = {},
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val tagColor = remember(transaction.tag, colorScheme) { getTagColor(transaction.tag, colorScheme) }

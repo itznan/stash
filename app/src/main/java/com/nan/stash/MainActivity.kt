@@ -140,22 +140,20 @@ class MainActivity : FragmentActivity() {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val params = window.attributes
-            val display = display
-            val modes = display?.supportedModes ?: emptyArray()
-            val maxMode = modes.maxByOrNull { it.refreshRate }
-            if (maxMode != null) {
-                params.preferredDisplayModeId = maxMode.modeId
-                params.preferredRefreshRate = maxMode.refreshRate.coerceAtLeast(120f)
-            } else {
-                params.preferredRefreshRate = 120f
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                params.setFrameRateBoostOnTouchEnabled(true)
-            }
-            window.attributes = params
+        val params = window.attributes
+        val display = display
+        val modes = display?.supportedModes ?: emptyArray()
+        val maxMode = modes.maxByOrNull { it.refreshRate }
+        if (maxMode != null) {
+            params.preferredDisplayModeId = maxMode.modeId
+            params.preferredRefreshRate = maxMode.refreshRate.coerceAtLeast(120f)
+        } else {
+            params.preferredRefreshRate = 120f
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            params.setFrameRateBoostOnTouchEnabled(true)
+        }
+        window.attributes = params
 
         super.onCreate(savedInstanceState)
 

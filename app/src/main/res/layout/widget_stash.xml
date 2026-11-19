@@ -17,6 +17,7 @@
         <ImageView
             android:layout_width="22dp"
             android:layout_height="22dp"
+            android:contentDescription="@null"
             android:src="@mipmap/ic_launcher_round" />
 
         <TextView
@@ -43,6 +44,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:baselineAligned="false"
         android:orientation="horizontal">
 
         <!-- Online (Bank) -->
@@ -96,7 +98,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <View
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="10dp"

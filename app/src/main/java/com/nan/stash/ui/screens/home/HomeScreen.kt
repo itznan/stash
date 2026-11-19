@@ -38,12 +38,12 @@ fun HomeScreen(
     currencySymbol: String,
     weeklyTrends: List<DayTrend>,
     onSeeAllClick: () -> Unit,
+    modifier: Modifier = Modifier,
     onTransactionClick: (TransactionEntity) -> Unit = {},
     loans: List<LoanEntity> = emptyList(),
     onLentCardClick: () -> Unit = {},
     subscriptions: List<SubscriptionEntity> = emptyList(),
-    onSubscriptionClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onSubscriptionClick: () -> Unit = {}
 ) {
     val (onlineBalance, cashBalance, totalIncome, totalExpense) = remember(transactions) {
         var online = 0.0

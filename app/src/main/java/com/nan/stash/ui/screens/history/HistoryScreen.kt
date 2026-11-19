@@ -57,8 +57,8 @@ fun HistoryScreen(
     currencySymbol: String,
     onDeleteTransaction: (TransactionEntity) -> Unit,
     onClearAll: () -> Unit,
-    onTransactionClick: (TransactionEntity) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onTransactionClick: (TransactionEntity) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }

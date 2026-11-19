@@ -41,8 +41,8 @@ import java.util.Locale
 fun TransactionRowCard(
     transaction: TransactionEntity,
     currencySymbol: String,
-    onClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     val dateString = remember(transaction.timestamp) {
         DateUtils.formatDate(transaction.timestamp)

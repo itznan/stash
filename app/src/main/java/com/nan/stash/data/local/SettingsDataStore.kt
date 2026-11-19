@@ -72,7 +72,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setBiometricEnabled(enabled: Boolean) {
-        securityPrefs.edit().putBoolean("biometric_enabled", enabled).commit()
+        securityPrefs.edit().putBoolean("biometric_enabled", enabled).apply()
         context.dataStore.edit { it[Keys.BIOMETRIC_ENABLED] = enabled }
     }
 }
