@@ -1,0 +1,6 @@
+Release v1.0.3:
+
+- Complete backup and restore: JSON snapshot now exports both transactions and peer-to-peer loan records
+- Atomic database operations: Guaranteed ACID transactions for loan creation and repayments
+- Scoped storage support: Reliable CSV/JSON export and share across Android 11 through 15
+- Zero network permissions, 100% offline & private
