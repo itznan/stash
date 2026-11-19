@@ -4,7 +4,9 @@ import android.app.Application
 import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import com.nan.stash.data.local.AppDatabase
+import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.data.local.SettingsDataStore
 import com.nan.stash.data.local.StashSettings
 import com.nan.stash.data.local.ThemeMode
@@ -68,7 +70,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val transactions: StateFlow<List<TransactionEntity>> = dao.getAllTransactions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val loans: StateFlow<List<com.nan.stash.data.local.LoanEntity>> = loanDao.getAllLoans()
+    val loans: StateFlow<List<LoanEntity>> = loanDao.getAllLoans()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val settings: StateFlow<StashSettings> = settingsDataStore.settingsFlow
@@ -106,92 +108,98 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         if (amount <= 0.0 || personName.isBlank()) return
         viewModelScope.launch {
-            loanDao.insertLoan(
-                com.nan.stash.data.local.LoanEntity(
-                    personName = personName.trim(),
-                    phoneNumber = phoneNumber.trim(),
-                    totalAmount = amount,
-                    remainingAmount = amount,
-                    reason = reason.trim(),
-                    lendDate = lendDate,
-                    dueDate = dueDate,
-                    initialPaymentMode = paymentMode,
-                    isSettled = false
+            db.withTransaction {
+                loanDao.insertLoan(
+                    LoanEntity(
+                        personName = personName.trim(),
+                        phoneNumber = phoneNumber.trim(),
+                        totalAmount = amount,
+                        remainingAmount = amount,
+                        reason = reason.trim(),
+                        lendDate = lendDate,
+                        dueDate = dueDate,
+                        initialPaymentMode = paymentMode,
+                        isSettled = false
+                    )
                 )
-            )
-            dao.insertTransaction(
-                TransactionEntity(
-                    type = TransactionType.LEND,
-                    amount = amount,
-                    tag = "Lent: ${personName.trim()}",
-                    note = if (reason.isNotBlank()) "Reason: ${reason.trim()}" else "Lent money",
-                    timestamp = lendDate,
-                    paymentMode = paymentMode
+                dao.insertTransaction(
+                    TransactionEntity(
+                        type = TransactionType.LEND,
+                        amount = amount,
+                        tag = "Lent: ${personName.trim()}",
+                        note = if (reason.isNotBlank()) "Reason: ${reason.trim()}" else "Lent money",
+                        timestamp = lendDate,
+                        paymentMode = paymentMode
+                    )
                 )
-            )
+            }
         }
     }
 
     fun recordRepayment(
-        loan: com.nan.stash.data.local.LoanEntity,
+        loan: LoanEntity,
         amountRepaid: Double,
         paymentMode: PaymentMode,
         note: String = ""
     ) {
         if (amountRepaid <= 0.0) return
         viewModelScope.launch {
-            val newRemaining = (loan.remainingAmount - amountRepaid).coerceAtLeast(0.0)
-            val settled = newRemaining <= 0.009
-            val updatedLoan = loan.copy(
-                remainingAmount = newRemaining,
-                isSettled = settled
-            )
-            loanDao.updateLoan(updatedLoan)
-
-            val repaymentNote = if (note.isNotBlank()) note else "Repayment from ${loan.personName}"
-            dao.insertTransaction(
-                TransactionEntity(
-                    type = TransactionType.REPAYMENT,
-                    amount = amountRepaid,
-                    tag = "Repaid: ${loan.personName}",
-                    note = repaymentNote,
-                    timestamp = System.currentTimeMillis(),
-                    paymentMode = paymentMode
+            db.withTransaction {
+                val newRemaining = (loan.remainingAmount - amountRepaid).coerceAtLeast(0.0)
+                val settled = newRemaining <= 0.009
+                val updatedLoan = loan.copy(
+                    remainingAmount = newRemaining,
+                    isSettled = settled
                 )
-            )
+                loanDao.updateLoan(updatedLoan)
+
+                val repaymentNote = if (note.isNotBlank()) note else "Repayment from ${loan.personName}"
+                dao.insertTransaction(
+                    TransactionEntity(
+                        type = TransactionType.REPAYMENT,
+                        amount = amountRepaid,
+                        tag = "Repaid: ${loan.personName}",
+                        note = repaymentNote,
+                        timestamp = System.currentTimeMillis(),
+                        paymentMode = paymentMode
+                    )
+                )
+            }
         }
     }
 
     fun addMoreToLoan(
-        loan: com.nan.stash.data.local.LoanEntity,
+        loan: LoanEntity,
         additionalAmount: Double,
         paymentMode: PaymentMode,
         note: String = ""
     ) {
         if (additionalAmount <= 0.0) return
         viewModelScope.launch {
-            val updatedLoan = loan.copy(
-                totalAmount = loan.totalAmount + additionalAmount,
-                remainingAmount = loan.remainingAmount + additionalAmount,
-                isSettled = false
-            )
-            loanDao.updateLoan(updatedLoan)
-
-            val lendNote = if (note.isNotBlank()) note else "Additional loan to ${loan.personName}"
-            dao.insertTransaction(
-                TransactionEntity(
-                    type = TransactionType.LEND,
-                    amount = additionalAmount,
-                    tag = "Lent: ${loan.personName}",
-                    note = lendNote,
-                    timestamp = System.currentTimeMillis(),
-                    paymentMode = paymentMode
+            db.withTransaction {
+                val updatedLoan = loan.copy(
+                    totalAmount = loan.totalAmount + additionalAmount,
+                    remainingAmount = loan.remainingAmount + additionalAmount,
+                    isSettled = false
                 )
-            )
+                loanDao.updateLoan(updatedLoan)
+
+                val lendNote = if (note.isNotBlank()) note else "Additional loan to ${loan.personName}"
+                dao.insertTransaction(
+                    TransactionEntity(
+                        type = TransactionType.LEND,
+                        amount = additionalAmount,
+                        tag = "Lent: ${loan.personName}",
+                        note = lendNote,
+                        timestamp = System.currentTimeMillis(),
+                        paymentMode = paymentMode
+                    )
+                )
+            }
         }
     }
 
-    fun deleteLoan(loan: com.nan.stash.data.local.LoanEntity) {
+    fun deleteLoan(loan: LoanEntity) {
         viewModelScope.launch {
             loanDao.deleteLoan(loan)
         }
@@ -257,7 +265,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearAllData() {
         viewModelScope.launch {
-            dao.clearAllTransactions()
+            db.withTransaction {
+                dao.clearAllTransactions()
+                loanDao.clearAllLoans()
+            }
         }
     }
 
@@ -429,17 +440,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return saveFileToStorage(filename, sb.toString())
     }
 
-    // Local Backup to JSON
-    fun createBackupJson(transactions: List<TransactionEntity>): File {
+    // Local Backup to JSON (Includes both transactions and loans)
+    fun createBackupJson(
+        transactions: List<TransactionEntity> = this.transactions.value,
+        loans: List<LoanEntity> = this.loans.value
+    ): File {
         val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val filename = "stash_backup_$timestampStr.json"
 
         val root = JSONObject()
-        root.put("version", 1)
+        root.put("version", 2)
         root.put("appName", "Stash")
         root.put("timestamp", System.currentTimeMillis())
 
-        val array = JSONArray()
+        val txArray = JSONArray()
         for (t in transactions) {
             val obj = JSONObject()
             obj.put("id", t.id)
@@ -449,40 +463,96 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             obj.put("note", t.note)
             obj.put("timestamp", t.timestamp)
             obj.put("paymentMode", t.paymentMode.name)
-            array.put(obj)
+            txArray.put(obj)
         }
-        root.put("transactions", array)
+        root.put("transactions", txArray)
+
+        val loanArray = JSONArray()
+        for (l in loans) {
+            val obj = JSONObject()
+            obj.put("id", l.id)
+            obj.put("personName", l.personName)
+            obj.put("phoneNumber", l.phoneNumber)
+            obj.put("totalAmount", l.totalAmount)
+            obj.put("remainingAmount", l.remainingAmount)
+            obj.put("reason", l.reason)
+            obj.put("lendDate", l.lendDate)
+            if (l.dueDate != null) {
+                obj.put("dueDate", l.dueDate)
+            }
+            obj.put("initialPaymentMode", l.initialPaymentMode.name)
+            obj.put("isSettled", l.isSettled)
+            loanArray.put(obj)
+        }
+        root.put("loans", loanArray)
 
         return saveFileToStorage(filename, root.toString(2))
     }
 
-    // Restore from JSON
+    // Restore from JSON (Restores transactions and loans atomically)
     fun restoreFromJson(jsonString: String, onResult: (Boolean, Int) -> Unit) {
         viewModelScope.launch {
             try {
                 val root = JSONObject(jsonString)
-                val array = root.getJSONArray("transactions")
-                val list = mutableListOf<TransactionEntity>()
-                for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
-                    val type = try { TransactionType.valueOf(obj.getString("type")) } catch (_: Exception) { TransactionType.EXPENSE }
-                    val paymentMode = try { PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE")) } catch (_: Exception) { PaymentMode.ONLINE }
-                    list.add(
-                        TransactionEntity(
-                            id = 0,
-                            type = type,
-                            amount = obj.getDouble("amount"),
-                            tag = obj.getString("tag"),
-                            note = obj.optString("note", ""),
-                            timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
-                            paymentMode = paymentMode
+                val txList = mutableListOf<TransactionEntity>()
+                if (root.has("transactions")) {
+                    val txArray = root.getJSONArray("transactions")
+                    for (i in 0 until txArray.length()) {
+                        val obj = txArray.getJSONObject(i)
+                        val type = try { TransactionType.valueOf(obj.getString("type")) } catch (_: Exception) { TransactionType.EXPENSE }
+                        val paymentMode = try { PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE")) } catch (_: Exception) { PaymentMode.ONLINE }
+                        txList.add(
+                            TransactionEntity(
+                                id = 0,
+                                type = type,
+                                amount = obj.getDouble("amount"),
+                                tag = obj.getString("tag"),
+                                note = obj.optString("note", ""),
+                                timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
+                                paymentMode = paymentMode
+                            )
                         )
-                    )
+                    }
                 }
-                if (list.isNotEmpty()) {
-                    dao.insertAll(list)
+
+                val loanList = mutableListOf<LoanEntity>()
+                if (root.has("loans")) {
+                    val loanArray = root.getJSONArray("loans")
+                    for (i in 0 until loanArray.length()) {
+                        val obj = loanArray.getJSONObject(i)
+                        val paymentMode = try {
+                            PaymentMode.valueOf(obj.optString("initialPaymentMode", "CASH"))
+                        } catch (_: Exception) {
+                            PaymentMode.CASH
+                        }
+                        val dueDate = if (obj.has("dueDate") && !obj.isNull("dueDate")) obj.getLong("dueDate") else null
+                        loanList.add(
+                            LoanEntity(
+                                id = 0,
+                                personName = obj.getString("personName"),
+                                phoneNumber = obj.optString("phoneNumber", ""),
+                                totalAmount = obj.getDouble("totalAmount"),
+                                remainingAmount = obj.getDouble("remainingAmount"),
+                                reason = obj.optString("reason", ""),
+                                lendDate = obj.optLong("lendDate", System.currentTimeMillis()),
+                                dueDate = dueDate,
+                                initialPaymentMode = paymentMode,
+                                isSettled = obj.optBoolean("isSettled", false)
+                            )
+                        )
+                    }
                 }
-                onResult(true, list.size)
+
+                db.withTransaction {
+                    if (txList.isNotEmpty()) {
+                        dao.insertAll(txList)
+                    }
+                    if (loanList.isNotEmpty()) {
+                        loanDao.insertAll(loanList)
+                    }
+                }
+                val totalRestored = txList.size + loanList.size
+                onResult(true, totalRestored)
             } catch (e: Exception) {
                 onResult(false, 0)
             }
@@ -491,18 +561,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun saveFileToStorage(filename: String, content: String): File {
         val context = getApplication<Application>()
-        // First try standard external public Downloads
-        return try {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!downloadsDir.exists()) downloadsDir.mkdirs()
-            val file = File(downloadsDir, filename)
-            file.writeText(content)
-            file
-        } catch (_: Exception) {
-            val fallbackDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-            val file = File(fallbackDir, filename)
-            file.writeText(content)
-            file
-        }
+        val targetDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+        if (!targetDir.exists()) targetDir.mkdirs()
+        val file = File(targetDir, filename)
+        file.writeText(content)
+        return file
     }
 }

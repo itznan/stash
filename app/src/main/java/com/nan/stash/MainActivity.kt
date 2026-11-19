@@ -277,7 +277,7 @@ class MainActivity : FragmentActivity() {
                                 viewModel.restoreFromJson(content) { success, count ->
                                     runOnUiThread {
                                         if (success) {
-                                            Toast.makeText(this@MainActivity, "Restored $count transactions from backup!", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(this@MainActivity, "Restored $count records from backup!", Toast.LENGTH_LONG).show()
                                         } else {
                                             Toast.makeText(this@MainActivity, "Failed: invalid backup file", Toast.LENGTH_LONG).show()
                                         }
@@ -354,7 +354,7 @@ class MainActivity : FragmentActivity() {
 
                 val onBackupJson: () -> Unit = {
                     try {
-                        val file = viewModel.createBackupJson(transactions)
+                        val file = viewModel.createBackupJson(transactions, loans)
                         Toast.makeText(this@MainActivity, "Backup saved: ${file.name}", Toast.LENGTH_LONG).show()
                         val uri = FileProvider.getUriForFile(this@MainActivity, "com.nan.stash.provider", file)
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {

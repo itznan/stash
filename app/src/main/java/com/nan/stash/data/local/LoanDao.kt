@@ -17,11 +17,17 @@ interface LoanDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLoan(loan: LoanEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(loans: List<LoanEntity>)
+
     @Update
     suspend fun updateLoan(loan: LoanEntity)
 
     @Delete
     suspend fun deleteLoan(loan: LoanEntity)
+
+    @Query("DELETE FROM loans")
+    suspend fun clearAllLoans()
 
     @Query("SELECT * FROM loans WHERE id = :id LIMIT 1")
     suspend fun getLoanById(id: Long): LoanEntity?
