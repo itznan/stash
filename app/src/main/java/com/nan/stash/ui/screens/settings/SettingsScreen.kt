@@ -27,6 +27,7 @@ fun SettingsScreen(
     innerPadding: PaddingValues,
     settings: StashSettings,
     onThemeChange: (ThemeMode) -> Unit,
+    onDynamicColorToggle: (Boolean) -> Unit = {},
     onCurrencyChange: (String) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
     onLowBalanceWarningToggle: (Boolean) -> Unit = {},
@@ -46,13 +47,13 @@ fun SettingsScreen(
                 context.packageManager.getPackageInfo(
                     context.packageName,
                     PackageManager.PackageInfoFlags.of(0)
-                ).versionName ?: "1.0.2"
+                ).versionName ?: "1.0.5"
             } else {
                 @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.2"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.5"
             }
         } catch (_: Exception) {
-            "1.0.2"
+            "1.0.5"
         }
     }
     var showClearDialog by remember { mutableStateOf(false) }
@@ -69,46 +70,41 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Appearance Card
+        // Dedicated Screen Header
         item {
-            AppearanceSettingsCard(
+            SettingsHeader()
+        }
+
+        // Section 1: Preferences (Theme, Dynamic Color, Currency)
+        item {
+            PreferencesSettingsCard(
                 themeMode = settings.themeMode,
-                onThemeChange = onThemeChange
-            )
-        }
-
-        // Security & Biometric Card
-        item {
-            SecuritySettingsCard(
-                isBiometricEnabled = settings.isBiometricEnabled,
-                onBiometricToggle = onBiometricToggle
-            )
-        }
-
-        // Currency Card
-        item {
-            CurrencySettingsCard(
+                dynamicColor = settings.dynamicColor,
                 currencySymbol = settings.currencySymbol,
+                onThemeChange = onThemeChange,
+                onDynamicColorToggle = onDynamicColorToggle,
                 onCurrencyChange = onCurrencyChange
             )
         }
 
-        // Low Balance Warning Card
+        // Section 2: Security & Alerts (Biometric, Low Balance)
         item {
-            LowBalanceSettingsCard(
-                enabled = settings.lowBalanceWarningEnabled,
+            SecurityAlertsSettingsCard(
+                isBiometricEnabled = settings.isBiometricEnabled,
+                lowBalanceWarningEnabled = settings.lowBalanceWarningEnabled,
                 lowOnlineThreshold = settings.lowOnlineThreshold,
                 lowCashThreshold = settings.lowCashThreshold,
                 currencySymbol = settings.currencySymbol,
-                onToggleEnabled = onLowBalanceWarningToggle,
+                onBiometricToggle = onBiometricToggle,
+                onLowBalanceWarningToggle = onLowBalanceWarningToggle,
                 onOnlineThresholdChange = onLowOnlineThresholdChange,
                 onCashThresholdChange = onLowCashThresholdChange
             )
         }
 
-        // Backup & Export Card
+        // Section 3: Data Management (PDF, CSV, Backup JSON, Restore JSON)
         item {
-            BackupExportSettingsCard(
+            DataManagementSettingsCard(
                 onExportPdf = onExportPdf,
                 onExportCsv = onExportCsv,
                 onBackupJson = onBackupJson,
@@ -116,17 +112,11 @@ fun SettingsScreen(
             )
         }
 
-        // Data & Privacy Card
+        // Section 4: About & Privacy (App Info, Destructive Reset)
         item {
-            DataPrivacySettingsCard(
+            AboutAndPrivacySettingsCard(
+                appVersionName = appVersionName,
                 onClearAllClick = { showClearDialog = true }
-            )
-        }
-
-        // About Card
-        item {
-            AboutSettingsCard(
-                appVersionName = appVersionName
             )
         }
     }

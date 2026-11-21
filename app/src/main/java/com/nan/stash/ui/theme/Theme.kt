@@ -21,14 +21,21 @@ val ColorScheme.spendingColor: Color
 @Composable
 fun StashTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
     // Dynamic color adapts to user wallpaper on Android 12+ (API 31+) with fallback
-    val colorScheme = try {
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } catch (_: Exception) {
-        if (darkTheme) darkColorScheme() else lightColorScheme()
+    val colorScheme = when {
+        dynamicColor -> {
+            try {
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            } catch (_: Exception) {
+                if (darkTheme) darkColorScheme() else lightColorScheme()
+            }
+        }
+        darkTheme -> darkColorScheme()
+        else -> lightColorScheme()
     }
 
     MaterialTheme(

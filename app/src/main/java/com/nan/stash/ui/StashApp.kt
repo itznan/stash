@@ -72,7 +72,7 @@ fun StashApp(
         ThemeMode.DARK -> true
     }
 
-    StashTheme(darkTheme = isDarkTheme) {
+    StashTheme(darkTheme = isDarkTheme, dynamicColor = settings.dynamicColor) {
         val pagerState = rememberPagerState(initialPage = 0, pageCount = { bottomNavScreens.size })
         val coroutineScope = rememberCoroutineScope()
         var scrollJob by remember { mutableStateOf<Job?>(null) }
@@ -216,6 +216,7 @@ fun StashApp(
                             innerPadding = innerPadding,
                             settings = settings,
                             onThemeChange = { viewModel.setThemeMode(it) },
+                            onDynamicColorToggle = { viewModel.setDynamicColor(it) },
                             onCurrencyChange = { viewModel.setCurrencySymbol(it) },
                             onBiometricToggle = onBiometricToggle,
                             onLowBalanceWarningToggle = { viewModel.setLowBalanceWarningEnabled(it) },
