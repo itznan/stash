@@ -1,37 +1,40 @@
-# Stash — Minimalist Offline Finance & Debt Tracker
+# Stash - Minimalist Offline Finance & Debt Tracker
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-12%20--%2015%20(API%2031%2B)-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
-[![F-Droid](https://img.shields.io/badge/F--Droid-Coming_Soon-1976D2.svg?logo=fdroid)](https://f-droid.org/packages/com.nan.stash/)
+[![GitHub Release](https://img.shields.io/github/v/release/itznan/stash?logo=github)](https://github.com/itznan/stash/releases)
+[![F-Droid](https://img.shields.io/badge/F--Droid-Package-1976D2.svg?logo=fdroid)](https://f-droid.org/packages/com.nan.stash/)
 [![Material 3](https://img.shields.io/badge/Design-Material_You_(Monet)-7986CB.svg)](https://m3.material.io)
 
-**Stash** is an ultra-fast, 100% offline personal finance, dual-wallet, and peer-to-peer loan tracker built with **Jetpack Compose** and **Material 3 Dynamic Theming (Monet)**.
+Stash is an ultra-fast, 100% offline personal finance, dual-wallet, and peer-to-peer loan tracker built for Android with Jetpack Compose and Material 3 Dynamic Theming (Monet).
 
 ---
 
 ## Features
 
 - **100% Offline & Private**: Zero internet permissions, zero analytics, zero ads, zero accounts. Your financial data never leaves your device.
-- **Dual-Wallet Architecture**: Track **Online Money** (bank/UPI) and **Cash Available** separately. Transfer between them with zero ledger distortion.
-- **Lent Money & Debt Manager**: Record loans given to friends or colleagues with due dates, partial repayments, and direct Call/WhatsApp action shortcuts.
-- **Native Keyboard Integration**: Ultra-fast decimal input with your mobile's native software keyboard.
-- **120Hz LTPO Optimization**: Zero-allocation date parsing, graphicsLayer hardware transforms, and fluid tab switching animations.
-- **Biometric Authentication**: Secure your transaction ledger behind fingerprint or device lock.
-- **Monet Dynamic Theming**: Adapts in real-time to your Android wallpaper accents in Light and Dark modes.
-- **Export & Backup**: Export CSVs for spreadsheet analysis and generate encrypted JSON backups with instant restore.
+- **Dual-Wallet Tracking**: Manage Online Money (bank/UPI) and Cash Available independently, with seamless zero-distortion transfers.
+- **Low Balance Warnings**: Configure custom warning thresholds for Online Money and Cash in Settings. Get instant visual warning badges on the dashboard and alerts before confirming expenses that exceed limits.
+- **Lent Money & Debt Manager**: Track money lent to friends or colleagues with due dates, partial repayments, and direct Call or WhatsApp shortcuts.
+- **Recurring Subscriptions**: Monitor monthly bills and recurring services with renewal dates, burn-rate summaries, and one-tap payment recording.
+- **Printable PDF Statements**: Generate clean, formatted A4 financial reports with net cash flow, income, expenses, and category breakdowns ready for printing or sharing.
+- **Home Screen Widget**: View live Online and Cash balances on your launcher, with quick-action shortcuts for Add Income, Spend, and Transfer.
+- **Interactive Analytics**: 7-day cash flow bar chart, ranked expense categories, visual donut breakdown, and Month-over-Month comparison metrics.
+- **Biometric Security**: Protect your financial data behind fingerprint authentication or device screen lock.
+- **Monet Dynamic Theming**: Fully responsive to Android wallpaper color accents in both Light and Dark modes.
+- **Export & Backup**: Export transaction ledgers to CSV for spreadsheets, or create complete local JSON snapshots (transactions, loans, subscriptions) with one-tap restore.
+- **120Hz LTPO Performance**: Built with zero-allocation date formatting, graphicsLayer hardware transforms, and fluid tab animations.
 
 ---
 
 ## Installation
 
-Stash is distributed via F-Droid. F-Droid builds the app from source and signs it with its own key.
-
-> [!IMPORTANT]
-> **One-Time Upgrade Notice for v1.0.0 / v1.0.1 Testers**: If you installed an earlier APK from GitHub, export your data backup first (**Settings -> Backup Database**), uninstall the old app, install from F-Droid, and restore your backup. Android does not permit upgrading over an APK signed with a different key.
+### GitHub Releases
+Download the signed APK directly from the [GitHub Releases](https://github.com/itznan/stash/releases) page.
 
 ### F-Droid
-- Install from F-Droid (pending merge of [Merge Request !57030](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/57030)):
-  - [F-Droid Package Listing (Coming Soon)](https://f-droid.org/packages/com.nan.stash/)
+Stash is available on F-Droid, built directly from source:
+- [F-Droid Package Listing](https://f-droid.org/packages/com.nan.stash/)
 
 ---
 
@@ -45,11 +48,12 @@ Stash is distributed via F-Droid. F-Droid builds the app from source and signs i
 ```bash
 # Clone the repository
 git clone https://github.com/itznan/stash.git
-cd Stash
+cd stash
 
-# Assemble the release APK (unsigned — F-Droid applies its own signature)
+# Assemble the release APK (unsigned)
 ./gradlew assembleRelease
 ```
+
 The output APK will be generated at:
 `app/build/outputs/apk/release/app-release-unsigned.apk`
 
