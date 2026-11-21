@@ -41,6 +41,7 @@ import com.nan.stash.ui.screens.transactions.EditTransactionBottomSheet
 import com.nan.stash.ui.screens.transactions.SpendMoneyBottomSheet
 import com.nan.stash.ui.screens.transactions.TransferMoneyBottomSheet
 import com.nan.stash.ui.theme.StashTheme
+import com.nan.stash.ui.util.AnalyticsCalculator
 import com.nan.stash.ui.widget.StashWidgetProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -63,6 +64,7 @@ fun StashApp(
     val weeklyTrends by viewModel.weeklyTrends.collectAsState()
     val categorySummaries by viewModel.categorySummaries.collectAsState()
     val monthComparison by viewModel.monthComparison.collectAsState()
+    val balances = remember(transactions) { AnalyticsCalculator.calculateWalletBalances(transactions) }
 
     val isDarkTheme = when (settings.themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -189,7 +191,10 @@ fun StashApp(
                             loans = loans,
                             onLentCardClick = { showLentManagerSheet = true },
                             subscriptions = subscriptions,
-                            onSubscriptionClick = { showSubscriptionSheet = true }
+                            onSubscriptionClick = { showSubscriptionSheet = true },
+                            lowBalanceWarningEnabled = settings.lowBalanceWarningEnabled,
+                            lowOnlineThreshold = settings.lowOnlineThreshold,
+                            lowCashThreshold = settings.lowCashThreshold
                         )
                         1 -> HistoryScreen(
                             innerPadding = innerPadding,
@@ -213,6 +218,9 @@ fun StashApp(
                             onThemeChange = { viewModel.setThemeMode(it) },
                             onCurrencyChange = { viewModel.setCurrencySymbol(it) },
                             onBiometricToggle = onBiometricToggle,
+                            onLowBalanceWarningToggle = { viewModel.setLowBalanceWarningEnabled(it) },
+                            onLowOnlineThresholdChange = { viewModel.setLowOnlineThreshold(it) },
+                            onLowCashThresholdChange = { viewModel.setLowCashThreshold(it) },
                             onExportCsv = onExportCsv,
                             onExportPdf = onExportPdf,
                             onBackupJson = onBackupJson,
@@ -297,7 +305,12 @@ fun StashApp(
                     onDismiss = { showSpendSheet = false },
                     onSave = { type, amount, tag, note, timestamp, paymentMode ->
                         viewModel.addTransaction(type, amount, tag, note, timestamp, paymentMode)
-                    }
+                    },
+                    onlineBalance = balances.onlineBalance,
+                    cashBalance = balances.cashBalance,
+                    lowBalanceWarningEnabled = settings.lowBalanceWarningEnabled,
+                    lowOnlineThreshold = settings.lowOnlineThreshold,
+                    lowCashThreshold = settings.lowCashThreshold
                 )
             }
 

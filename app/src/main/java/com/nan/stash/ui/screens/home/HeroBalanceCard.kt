@@ -1,5 +1,6 @@
 package com.nan.stash.ui.screens.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -46,6 +48,10 @@ fun HeroBalanceCard(
     transactionCount: Int,
     currencySymbol: String,
     currencyFormatter: NumberFormat,
+    isOnlineLow: Boolean = false,
+    isCashLow: Boolean = false,
+    lowOnlineThreshold: Double = 0.0,
+    lowCashThreshold: Double = 0.0,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -125,42 +131,74 @@ fun HeroBalanceCard(
                 Surface(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = if (isOnlineLow) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)) else null
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp)
                     ) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.AccountBalance,
-                                    contentDescription = "Online Money",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(15.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.AccountBalance,
+                                        contentDescription = "Online Money",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "Online Money",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = "Online Money",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (isOnlineLow) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.errorContainer
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Warning,
+                                            contentDescription = "Low Balance",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = "Low",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         val onlineSign = if (onlineBalance < 0) "-" else ""
                         Text(
                             text = "$onlineSign$currencySymbol${currencyFormatter.format(Math.abs(onlineBalance))}",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (onlineBalance >= 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.spendingColor
+                            color = if (isOnlineLow || onlineBalance < 0) MaterialTheme.colorScheme.spendingColor else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -169,42 +207,74 @@ fun HeroBalanceCard(
                 Surface(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = if (isCashLow) BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)) else null
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp)
                     ) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Payments,
-                                    contentDescription = "Cash Available",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(15.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Payments,
+                                        contentDescription = "Cash Available",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "Cash Available",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = "Cash Available",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (isCashLow) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.errorContainer
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Warning,
+                                            contentDescription = "Low Balance",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = "Low",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         val cashSign = if (cashBalance < 0) "-" else ""
                         Text(
                             text = "$cashSign$currencySymbol${currencyFormatter.format(Math.abs(cashBalance))}",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (cashBalance >= 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.spendingColor
+                            color = if (isCashLow || cashBalance < 0) MaterialTheme.colorScheme.spendingColor else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -294,6 +364,41 @@ fun HeroBalanceCard(
                                 color = MaterialTheme.colorScheme.spendingColor
                             )
                         }
+                    }
+                }
+            }
+
+            // Low Balance Warning Banner
+            if (isOnlineLow || isCashLow) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Warning,
+                            contentDescription = "Low Balance Warning",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        val warningText = when {
+                            isOnlineLow && isCashLow -> "Low Balance: Both Online and Cash funds are below your warning limit."
+                            isOnlineLow -> "Low Balance: Online money is below $currencySymbol${currencyFormatter.format(lowOnlineThreshold)}."
+                            else -> "Low Balance: Cash is below $currencySymbol${currencyFormatter.format(lowCashThreshold)}."
+                        }
+                        Text(
+                            text = warningText,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
                     }
                 }
             }

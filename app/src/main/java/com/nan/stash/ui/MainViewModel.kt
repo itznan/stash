@@ -348,6 +348,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setLowBalanceWarningEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setLowBalanceWarningEnabled(enabled)
+        }
+    }
+
+    fun setLowOnlineThreshold(amount: Double) {
+        viewModelScope.launch {
+            settingsDataStore.setLowOnlineThreshold(amount)
+        }
+    }
+
+    fun setLowCashThreshold(amount: Double) {
+        viewModelScope.launch {
+            settingsDataStore.setLowCashThreshold(amount)
+        }
+    }
+
     // Helper functions delegation
     fun calculateCategorySummaries(transactions: List<TransactionEntity>): List<CategorySummary> =
         AnalyticsCalculator.calculateCategorySummaries(transactions)

@@ -4,13 +4,68 @@ import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.CategorySummary
 import com.nan.stash.data.model.DayTrend
 import com.nan.stash.data.model.MonthComparison
+import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+data class WalletBalances(
+    val onlineBalance: Double = 0.0,
+    val cashBalance: Double = 0.0,
+    val totalIncome: Double = 0.0,
+    val totalExpense: Double = 0.0
+) {
+    val netBalance: Double get() = onlineBalance + cashBalance
+}
+
 object AnalyticsCalculator {
+
+    fun calculateWalletBalances(transactions: List<TransactionEntity>): WalletBalances {
+        var online = 0.0
+        var cash = 0.0
+        var income = 0.0
+        var expense = 0.0
+        for (t in transactions) {
+            val isOnline = t.paymentMode == PaymentMode.ONLINE
+            when (t.type) {
+                TransactionType.INCOME -> {
+                    income += t.amount
+                    if (isOnline) online += t.amount else cash += t.amount
+                }
+                TransactionType.EXPENSE -> {
+                    expense += t.amount
+                    if (isOnline) online -= t.amount else cash -= t.amount
+                }
+                TransactionType.TRANSFER -> {
+                    if (isOnline) {
+                        online -= t.amount
+                        cash += t.amount
+                    } else {
+                        cash -= t.amount
+                        online += t.amount
+                    }
+                }
+                TransactionType.LEND -> {
+                    if (isOnline) online -= t.amount else cash -= t.amount
+                }
+                TransactionType.REPAYMENT -> {
+                    if (isOnline) online += t.amount else cash += t.amount
+                }
+            }
+        }
+        return WalletBalances(
+            onlineBalance = online,
+            cashBalance = cash,
+            totalIncome = income,
+            totalExpense = expense
+        )
+    }
+
+    fun isLowBalance(balance: Double, threshold: Double, enabled: Boolean): Boolean {
+        return enabled && threshold > 0.0 && balance <= threshold
+    }
 
     fun calculateCategorySummaries(transactions: List<TransactionEntity>): List<CategorySummary> {
         val expenses = transactions.filter { it.type == TransactionType.EXPENSE }

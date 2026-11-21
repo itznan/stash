@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachMoney
 import androidx.compose.material.icons.rounded.DarkMode
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.TableChart
@@ -29,19 +31,26 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nan.stash.data.local.StashSettings
 import com.nan.stash.data.local.ThemeMode
+import java.util.Locale
 
 @Composable
 fun SettingsCardHeader(icon: ImageVector, title: String) {
@@ -177,6 +186,175 @@ fun CurrencySettingsCard(
                         label = { Text(sym, fontWeight = FontWeight.Bold) },
                         shape = CircleShape
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LowBalanceSettingsCard(
+    enabled: Boolean,
+    lowOnlineThreshold: Double,
+    lowCashThreshold: Double,
+    currencySymbol: String,
+    onToggleEnabled: (Boolean) -> Unit,
+    onOnlineThresholdChange: (Double) -> Unit,
+    onCashThresholdChange: (Double) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var onlineInput by remember(lowOnlineThreshold) {
+        mutableStateOf(if (lowOnlineThreshold > 0.0) String.format(Locale.US, "%.2f", lowOnlineThreshold).trimEnd('0').trimEnd('.') else "")
+    }
+    var cashInput by remember(lowCashThreshold) {
+        mutableStateOf(if (lowCashThreshold > 0.0) String.format(Locale.US, "%.2f", lowCashThreshold).trimEnd('0').trimEnd('.') else "")
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            SettingsCardHeader(icon = Icons.Rounded.NotificationsActive, title = "LOW BALANCE WARNINGS")
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleEnabled(!enabled) }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Low Balance Alerts",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Show warning indicator when funds fall below threshold",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { onToggleEnabled(it) }
+                )
+            }
+
+            if (enabled) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Online Money threshold
+                Text(
+                    text = "Online Money Alert Threshold",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Warn when Online Money is at or below this amount",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = onlineInput,
+                    onValueChange = { input ->
+                        val clean = input.replace(',', '.')
+                        if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                            onlineInput = clean
+                            val amt = clean.toDoubleOrNull() ?: 0.0
+                            onOnlineThresholdChange(amt)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("0.00") },
+                    prefix = { Text("$currencySymbol ") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val onlinePresets = listOf(25.0, 50.0, 100.0, 250.0, 500.0)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    onlinePresets.forEach { preset ->
+                        FilterChip(
+                            selected = lowOnlineThreshold == preset,
+                            onClick = {
+                                onOnlineThresholdChange(preset)
+                                onlineInput = String.format(Locale.US, "%.0f", preset)
+                            },
+                            label = { Text("$currencySymbol${preset.toInt()}", fontWeight = FontWeight.SemiBold) },
+                            shape = CircleShape
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Cash threshold
+                Text(
+                    text = "Cash Available Alert Threshold",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Warn when Cash Available is at or below this amount",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = cashInput,
+                    onValueChange = { input ->
+                        val clean = input.replace(',', '.')
+                        if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                            cashInput = clean
+                            val amt = clean.toDoubleOrNull() ?: 0.0
+                            onCashThresholdChange(amt)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("0.00") },
+                    prefix = { Text("$currencySymbol ") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val cashPresets = listOf(10.0, 20.0, 50.0, 100.0, 200.0)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    cashPresets.forEach { preset ->
+                        FilterChip(
+                            selected = lowCashThreshold == preset,
+                            onClick = {
+                                onCashThresholdChange(preset)
+                                cashInput = String.format(Locale.US, "%.0f", preset)
+                            },
+                            label = { Text("$currencySymbol${preset.toInt()}", fontWeight = FontWeight.SemiBold) },
+                            shape = CircleShape
+                        )
+                    }
                 }
             }
         }

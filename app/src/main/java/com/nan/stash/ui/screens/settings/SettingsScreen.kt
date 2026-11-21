@@ -29,6 +29,9 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     onCurrencyChange: (String) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
+    onLowBalanceWarningToggle: (Boolean) -> Unit = {},
+    onLowOnlineThresholdChange: (Double) -> Unit = {},
+    onLowCashThresholdChange: (Double) -> Unit = {},
     onExportCsv: () -> Unit,
     onExportPdf: () -> Unit,
     onBackupJson: () -> Unit,
@@ -87,6 +90,19 @@ fun SettingsScreen(
             CurrencySettingsCard(
                 currencySymbol = settings.currencySymbol,
                 onCurrencyChange = onCurrencyChange
+            )
+        }
+
+        // Low Balance Warning Card
+        item {
+            LowBalanceSettingsCard(
+                enabled = settings.lowBalanceWarningEnabled,
+                lowOnlineThreshold = settings.lowOnlineThreshold,
+                lowCashThreshold = settings.lowCashThreshold,
+                currencySymbol = settings.currencySymbol,
+                onToggleEnabled = onLowBalanceWarningToggle,
+                onOnlineThresholdChange = onLowOnlineThresholdChange,
+                onCashThresholdChange = onLowCashThresholdChange
             )
         }
 

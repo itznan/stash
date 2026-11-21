@@ -1,5 +1,6 @@
 package com.nan.stash.ui.screens.transactions
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -65,7 +68,12 @@ import java.util.Locale
 fun SpendMoneyBottomSheet(
     currencySymbol: String,
     onDismiss: () -> Unit,
-    onSave: (type: TransactionType, amount: Double, tag: String, note: String, timestamp: Long, paymentMode: PaymentMode) -> Unit
+    onSave: (type: TransactionType, amount: Double, tag: String, note: String, timestamp: Long, paymentMode: PaymentMode) -> Unit,
+    onlineBalance: Double = 0.0,
+    cashBalance: Double = 0.0,
+    lowBalanceWarningEnabled: Boolean = false,
+    lowOnlineThreshold: Double = 0.0,
+    lowCashThreshold: Double = 0.0
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var amountString by remember { mutableStateOf("") }
@@ -274,6 +282,46 @@ fun SpendMoneyBottomSheet(
                     Icon(imageVector = Icons.Rounded.EditNote, contentDescription = null)
                 }
             )
+
+            val isLowWarning = remember(selectedPaymentMode, parsedAmount, onlineBalance, cashBalance, lowBalanceWarningEnabled, lowOnlineThreshold, lowCashThreshold) {
+                if (!lowBalanceWarningEnabled) false
+                else if (selectedPaymentMode == PaymentMode.ONLINE && lowOnlineThreshold > 0.0) {
+                    (onlineBalance - parsedAmount) <= lowOnlineThreshold
+                } else if (selectedPaymentMode == PaymentMode.CASH && lowCashThreshold > 0.0) {
+                    (cashBalance - parsedAmount) <= lowCashThreshold
+                } else false
+            }
+
+            if (isLowWarning && parsedAmount > 0.0) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val modeName = if (selectedPaymentMode == PaymentMode.ONLINE) "Online" else "Cash"
+                        val remaining = if (selectedPaymentMode == PaymentMode.ONLINE) onlineBalance - parsedAmount else cashBalance - parsedAmount
+                        Text(
+                            text = "Warning: Low $modeName balance ($currencySymbol${String.format(Locale.US, "%.2f", remaining)} remaining)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(22.dp))
 

@@ -1,0 +1,7 @@
+Release v1.0.5:
+
+- Low Balance Warnings: Configure alert thresholds for Online Money and Cash Available in Settings
+- Dashboard Alerts: Visual warning badges and status indicator on balance card when funds drop below limit
+- Overspending Warning: Real-time alert before confirming an expense if wallet funds will drop below threshold
+- Optimized wallet balance calculations with full automated unit test coverage
+- Zero network permissions, 100% offline and private

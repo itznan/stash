@@ -89,4 +89,51 @@ class AnalyticsCalculatorTest {
         // (150 - 100) / 100 * 100 = +50%
         assertEquals(50.0f, comparison.expenseDiffPercentage, 0.01f)
     }
+
+    @Test
+    fun calculateWalletBalances_computesCorrectBalancesAcrossPaymentModes() {
+        val txs = listOf(
+            TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 1000.0, tag = "Salary", paymentMode = PaymentMode.ONLINE),
+            TransactionEntity(id = 2, type = TransactionType.INCOME, amount = 200.0, tag = "Gift", paymentMode = PaymentMode.CASH),
+            TransactionEntity(id = 3, type = TransactionType.EXPENSE, amount = 150.0, tag = "Shopping", paymentMode = PaymentMode.ONLINE),
+            TransactionEntity(id = 4, type = TransactionType.EXPENSE, amount = 50.0, tag = "Food", paymentMode = PaymentMode.CASH),
+            // Online -> Cash transfer of 100
+            TransactionEntity(id = 5, type = TransactionType.TRANSFER, amount = 100.0, tag = "Transfer", paymentMode = PaymentMode.ONLINE),
+            // Lend 200 from Online
+            TransactionEntity(id = 6, type = TransactionType.LEND, amount = 200.0, tag = "Lent", paymentMode = PaymentMode.ONLINE),
+            // Repayment 50 to Cash
+            TransactionEntity(id = 7, type = TransactionType.REPAYMENT, amount = 50.0, tag = "Repaid", paymentMode = PaymentMode.CASH)
+        )
+
+        val balances = AnalyticsCalculator.calculateWalletBalances(txs)
+        // Online: +1000 - 150 - 100 - 200 = 550.0
+        assertEquals(550.0, balances.onlineBalance, 0.001)
+        // Cash: +200 - 50 + 100 + 50 = 300.0
+        assertEquals(300.0, balances.cashBalance, 0.001)
+        // Net: 550 + 300 = 850.0
+        assertEquals(850.0, balances.netBalance, 0.001)
+        // Total Income: 1000 + 200 = 1200.0
+        assertEquals(1200.0, balances.totalIncome, 0.001)
+        // Total Expense: 150 + 50 = 200.0
+        assertEquals(200.0, balances.totalExpense, 0.001)
+    }
+
+    @Test
+    fun isLowBalance_checksThresholdAndEnabledProperly() {
+        // Disabled: never triggers
+        assertFalse(AnalyticsCalculator.isLowBalance(balance = 10.0, threshold = 50.0, enabled = false))
+
+        // Threshold zero or negative: never triggers
+        assertFalse(AnalyticsCalculator.isLowBalance(balance = 0.0, threshold = 0.0, enabled = true))
+        assertFalse(AnalyticsCalculator.isLowBalance(balance = -10.0, threshold = -5.0, enabled = true))
+
+        // Balance above threshold: no trigger
+        assertFalse(AnalyticsCalculator.isLowBalance(balance = 100.0, threshold = 50.0, enabled = true))
+
+        // Balance at or below threshold: triggers
+        assertTrue(AnalyticsCalculator.isLowBalance(balance = 50.0, threshold = 50.0, enabled = true))
+        assertTrue(AnalyticsCalculator.isLowBalance(balance = 25.0, threshold = 50.0, enabled = true))
+        assertTrue(AnalyticsCalculator.isLowBalance(balance = 0.0, threshold = 50.0, enabled = true))
+        assertTrue(AnalyticsCalculator.isLowBalance(balance = -10.0, threshold = 50.0, enabled = true))
+    }
 }

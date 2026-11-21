@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,7 +21,10 @@ data class StashSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = true,
     val currencySymbol: String = "$",
-    val isBiometricEnabled: Boolean = false
+    val isBiometricEnabled: Boolean = false,
+    val lowBalanceWarningEnabled: Boolean = false,
+    val lowOnlineThreshold: Double = 0.0,
+    val lowCashThreshold: Double = 0.0
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -36,6 +40,9 @@ class SettingsDataStore(private val context: Context) {
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val CURRENCY_SYMBOL = stringPreferencesKey("currency_symbol")
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
+        val LOW_BALANCE_WARNING_ENABLED = booleanPreferencesKey("low_balance_warning_enabled")
+        val LOW_ONLINE_THRESHOLD = doublePreferencesKey("low_online_threshold")
+        val LOW_CASH_THRESHOLD = doublePreferencesKey("low_cash_threshold")
     }
 
     val settingsFlow: Flow<StashSettings> = context.dataStore.data.map { preferences ->
@@ -55,7 +62,10 @@ class SettingsDataStore(private val context: Context) {
             themeMode = themeMode,
             dynamicColor = preferences[Keys.DYNAMIC_COLOR] ?: true,
             currencySymbol = preferences[Keys.CURRENCY_SYMBOL] ?: "$",
-            isBiometricEnabled = bioEnabled
+            isBiometricEnabled = bioEnabled,
+            lowBalanceWarningEnabled = preferences[Keys.LOW_BALANCE_WARNING_ENABLED] ?: false,
+            lowOnlineThreshold = preferences[Keys.LOW_ONLINE_THRESHOLD] ?: 0.0,
+            lowCashThreshold = preferences[Keys.LOW_CASH_THRESHOLD] ?: 0.0
         )
     }
 
@@ -74,5 +84,17 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setBiometricEnabled(enabled: Boolean) {
         securityPrefs.edit().putBoolean("biometric_enabled", enabled).apply()
         context.dataStore.edit { it[Keys.BIOMETRIC_ENABLED] = enabled }
+    }
+
+    suspend fun setLowBalanceWarningEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.LOW_BALANCE_WARNING_ENABLED] = enabled }
+    }
+
+    suspend fun setLowOnlineThreshold(amount: Double) {
+        context.dataStore.edit { it[Keys.LOW_ONLINE_THRESHOLD] = amount }
+    }
+
+    suspend fun setLowCashThreshold(amount: Double) {
+        context.dataStore.edit { it[Keys.LOW_CASH_THRESHOLD] = amount }
     }
 }

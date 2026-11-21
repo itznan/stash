@@ -26,8 +26,7 @@ import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.data.local.SubscriptionEntity
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.DayTrend
-import com.nan.stash.data.model.PaymentMode
-import com.nan.stash.data.model.TransactionType
+import com.nan.stash.ui.util.AnalyticsCalculator
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -43,45 +42,22 @@ fun HomeScreen(
     loans: List<LoanEntity> = emptyList(),
     onLentCardClick: () -> Unit = {},
     subscriptions: List<SubscriptionEntity> = emptyList(),
-    onSubscriptionClick: () -> Unit = {}
+    onSubscriptionClick: () -> Unit = {},
+    lowBalanceWarningEnabled: Boolean = false,
+    lowOnlineThreshold: Double = 0.0,
+    lowCashThreshold: Double = 0.0
 ) {
-    val (onlineBalance, cashBalance, totalIncome, totalExpense) = remember(transactions) {
-        var online = 0.0
-        var cash = 0.0
-        var income = 0.0
-        var expense = 0.0
-        for (t in transactions) {
-            val isOnline = t.paymentMode == PaymentMode.ONLINE
-            when (t.type) {
-                TransactionType.INCOME -> {
-                    income += t.amount
-                    if (isOnline) online += t.amount else cash += t.amount
-                }
-                TransactionType.EXPENSE -> {
-                    expense += t.amount
-                    if (isOnline) online -= t.amount else cash -= t.amount
-                }
-                TransactionType.TRANSFER -> {
-                    if (isOnline) {
-                        online -= t.amount
-                        cash += t.amount
-                    } else {
-                        cash -= t.amount
-                        online += t.amount
-                    }
-                }
-                TransactionType.LEND -> {
-                    if (isOnline) online -= t.amount else cash -= t.amount
-                }
-                TransactionType.REPAYMENT -> {
-                    if (isOnline) online += t.amount else cash += t.amount
-                }
-            }
-        }
-        arrayOf(online, cash, income, expense)
+    val balances = remember(transactions) {
+        AnalyticsCalculator.calculateWalletBalances(transactions)
     }
 
-    val netBalance = onlineBalance + cashBalance
+    val isOnlineLow = remember(balances.onlineBalance, lowOnlineThreshold, lowBalanceWarningEnabled) {
+        AnalyticsCalculator.isLowBalance(balances.onlineBalance, lowOnlineThreshold, lowBalanceWarningEnabled)
+    }
+
+    val isCashLow = remember(balances.cashBalance, lowCashThreshold, lowBalanceWarningEnabled) {
+        AnalyticsCalculator.isLowBalance(balances.cashBalance, lowCashThreshold, lowBalanceWarningEnabled)
+    }
 
     val recentTransactions = remember(transactions) {
         transactions.take(5)
@@ -114,14 +90,18 @@ fun HomeScreen(
         // Hero Balance Card (28dp Rounded)
         item {
             HeroBalanceCard(
-                netBalance = netBalance,
-                onlineBalance = onlineBalance,
-                cashBalance = cashBalance,
-                totalIncome = totalIncome,
-                totalExpense = totalExpense,
+                netBalance = balances.netBalance,
+                onlineBalance = balances.onlineBalance,
+                cashBalance = balances.cashBalance,
+                totalIncome = balances.totalIncome,
+                totalExpense = balances.totalExpense,
                 transactionCount = transactions.size,
                 currencySymbol = currencySymbol,
-                currencyFormatter = currencyFormatter
+                currencyFormatter = currencyFormatter,
+                isOnlineLow = isOnlineLow,
+                isCashLow = isCashLow,
+                lowOnlineThreshold = lowOnlineThreshold,
+                lowCashThreshold = lowCashThreshold
             )
         }
 
