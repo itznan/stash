@@ -60,17 +60,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun isBiometricEnabledSync(): Boolean = settingsDataStore.isBiometricEnabledSync()
 
-    val weeklyTrends: StateFlow<List<DayTrend>> = dao.getAllTransactions()
+    val weeklyTrends: StateFlow<List<DayTrend>> = transactions
         .map { AnalyticsCalculator.calculateWeeklyTrends(it) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val categorySummaries: StateFlow<List<CategorySummary>> = dao.getAllTransactions()
+    val categorySummaries: StateFlow<List<CategorySummary>> = transactions
         .map { AnalyticsCalculator.calculateCategorySummaries(it) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val monthComparison: StateFlow<MonthComparison> = dao.getAllTransactions()
+    val monthComparison: StateFlow<MonthComparison> = transactions
         .map { AnalyticsCalculator.calculateMonthComparison(it) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthComparison())
@@ -393,6 +393,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val restored = BackupManager.parseBackupJson(jsonString)
+                val totalRestored = restored.transactions.size + restored.loans.size + restored.subscriptions.size
+                if (totalRestored == 0) {
+                    onResult(false, 0)
+                    return@launch
+                }
                 db.withTransaction {
                     dao.clearAllTransactions()
                     loanDao.clearAllLoans()
@@ -402,7 +407,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (restored.subscriptions.isNotEmpty()) subscriptionDao.insertAll(restored.subscriptions)
                 }
                 notifyWidgetUpdate()
-                val totalRestored = restored.transactions.size + restored.loans.size + restored.subscriptions.size
                 onResult(true, totalRestored)
             } catch (e: Exception) {
                 onResult(false, 0)

@@ -84,64 +84,6 @@ fun getTagColor(tag: String, colorScheme: ColorScheme): Color {
 fun getDynamicTagColor(tag: String): Color = getTagColor(tag, MaterialTheme.colorScheme)
 
 @Composable
-fun NumericKeypad(
-    onDigitClick: (String) -> Unit,
-    onDeleteClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val keys = listOf(
-        listOf("1", "2", "3"),
-        listOf("4", "5", "6"),
-        listOf("7", "8", "9"),
-        listOf(".", "0", "DEL")
-    )
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        keys.forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                row.forEach { key ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .clickable {
-                                if (key == "DEL") onDeleteClick() else onDigitClick(key)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (key == "DEL") {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.Backspace,
-                                contentDescription = "Delete",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        } else {
-                            Text(
-                                text = key,
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 22.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun FilledIconButtonSmall(
     icon: ImageVector,
     contentDescription: String,

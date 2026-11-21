@@ -28,38 +28,18 @@ object PdfStatementGenerator {
         currencySymbol: String
     ): File {
         val document = PdfDocument()
+        try {
+            val paintText = Paint(Paint.ANTI_ALIAS_FLAG)
+            val paintBg = Paint(Paint.ANTI_ALIAS_FLAG)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val generatedDateStr = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault()).format(Date())
 
-        val paintText = Paint(Paint.ANTI_ALIAS_FLAG)
-        val paintBg = Paint(Paint.ANTI_ALIAS_FLAG)
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val generatedDateStr = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault()).format(Date())
-
-        val totalIncome = transactions.filter { it.type == TransactionType.INCOME || it.type == TransactionType.REPAYMENT }.sumOf { it.amount }
-        val totalExpense = transactions.filter { it.type == TransactionType.EXPENSE || it.type == TransactionType.LEND }.sumOf { it.amount }
-        val netSavings = totalIncome - totalExpense
-
-        val onlineBal = transactions.sumOf {
-            when {
-                it.type == TransactionType.INCOME && it.paymentMode == PaymentMode.ONLINE -> it.amount
-                it.type == TransactionType.REPAYMENT && it.paymentMode == PaymentMode.ONLINE -> it.amount
-                it.type == TransactionType.EXPENSE && it.paymentMode == PaymentMode.ONLINE -> -it.amount
-                it.type == TransactionType.LEND && it.paymentMode == PaymentMode.ONLINE -> -it.amount
-                it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.ONLINE -> -it.amount
-                it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.CASH -> it.amount
-                else -> 0.0
-            }
-        }
-        val cashBal = transactions.sumOf {
-            when {
-                it.type == TransactionType.INCOME && it.paymentMode == PaymentMode.CASH -> it.amount
-                it.type == TransactionType.REPAYMENT && it.paymentMode == PaymentMode.CASH -> it.amount
-                it.type == TransactionType.EXPENSE && it.paymentMode == PaymentMode.CASH -> -it.amount
-                it.type == TransactionType.LEND && it.paymentMode == PaymentMode.CASH -> -it.amount
-                it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.CASH -> -it.amount
-                it.type == TransactionType.TRANSFER && it.paymentMode == PaymentMode.ONLINE -> it.amount
-                else -> 0.0
-            }
-        }
+            val balances = AnalyticsCalculator.calculateWalletBalances(transactions)
+            val totalIncome = balances.totalIncome
+            val totalExpense = balances.totalExpense
+            val netSavings = balances.netBalance
+            val onlineBal = balances.onlineBalance
+            val cashBal = balances.cashBalance
 
         var pageNumber = 1
         var pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNumber).create()
@@ -251,8 +231,9 @@ object PdfStatementGenerator {
         FileOutputStream(outputFile).use { out ->
             document.writeTo(out)
         }
-        document.close()
-
         return outputFile
+    } finally {
+        document.close()
     }
+}
 }

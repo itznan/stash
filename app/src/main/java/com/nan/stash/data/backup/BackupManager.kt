@@ -115,6 +115,11 @@ object BackupManager {
 
     fun parseBackupJson(jsonString: String): RestoredBackupData {
         val root = JSONObject(jsonString)
+        val hasValidHeader = root.optString("appName") == "Stash" || root.has("version")
+        val hasKnownKeys = root.has("transactions") || root.has("loans") || root.has("subscriptions")
+        if (!hasValidHeader || !hasKnownKeys) {
+            throw IllegalArgumentException("Invalid backup file: not a recognized Stash backup")
+        }
         val txList = mutableListOf<TransactionEntity>()
         if (root.has("transactions")) {
             val txArray = root.getJSONArray("transactions")

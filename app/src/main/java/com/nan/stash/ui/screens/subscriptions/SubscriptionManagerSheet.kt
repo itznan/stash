@@ -61,13 +61,22 @@ fun SubscriptionManagerSheet(
 
     val totalMonthly = subscriptions.filter { it.isActive }.sumOf { it.amount }
 
-    val currentMonth = Calendar.getInstance().get(Calendar.MONTH)
-    val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+    val (startOfMonth, endOfMonth) = remember {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val start = cal.timeInMillis
+        cal.add(Calendar.MONTH, 1)
+        val end = cal.timeInMillis
+        start to end
+    }
 
     fun isPaidThisMonth(lastPaid: Long?): Boolean {
-        if (lastPaid == null) return false
-        val cal = Calendar.getInstance().apply { timeInMillis = lastPaid }
-        return cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.YEAR) == currentYear
+        return lastPaid != null && lastPaid in startOfMonth until endOfMonth
     }
 
     ModalBottomSheet(

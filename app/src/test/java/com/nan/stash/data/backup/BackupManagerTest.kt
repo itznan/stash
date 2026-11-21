@@ -91,4 +91,16 @@ class BackupManagerTest {
         assertEquals(0, restored.loans.size)
         assertEquals(0, restored.subscriptions.size)
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun parseBackupJson_foreignJson_throwsException() {
+        val json = """{"name": "some-random-package", "version": "1.0.0"}"""
+        BackupManager.parseBackupJson(json)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun parseBackupJson_emptyJson_throwsException() {
+        val json = "{}"
+        BackupManager.parseBackupJson(json)
+    }
 }

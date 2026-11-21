@@ -8,6 +8,7 @@ import com.nan.stash.data.local.AppDatabase
 import com.nan.stash.data.local.MIGRATION_1_2
 import com.nan.stash.data.local.MIGRATION_2_3
 import com.nan.stash.data.local.MIGRATION_3_4
+import com.nan.stash.data.local.MIGRATION_4_5
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -93,6 +94,40 @@ class MigrationTest {
     }
 
     @Test
+    fun migrate4To5() {
+        var db = helper.createDatabase(TEST_DB, 4).apply {
+            execSQL("INSERT INTO transactions (id, type, amount, tag, note, timestamp, paymentMode) VALUES (4, 'EXPENSE', 10.0, 'snack', '', 1700000003000, 'ONLINE')")
+            execSQL("INSERT INTO loans (id, personName, phoneNumber, totalAmount, remainingAmount, reason, lendDate, dueDate, initialPaymentMode, isSettled) VALUES (2, 'Bob', '', 50.0, 50.0, '', 1700000000000, NULL, 'ONLINE', 0)")
+            close()
+        }
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5)
+
+        // Verify existing tables preserved
+        val txCursor = db.query("SELECT id, type, amount FROM transactions WHERE id = 4")
+        assertTrue(txCursor.moveToFirst())
+        assertEquals(4L, txCursor.getLong(txCursor.getColumnIndexOrThrow("id")))
+        txCursor.close()
+
+        val loanCursor = db.query("SELECT personName, remainingAmount FROM loans WHERE id = 2")
+        assertTrue(loanCursor.moveToFirst())
+        assertEquals("Bob", loanCursor.getString(loanCursor.getColumnIndexOrThrow("personName")))
+        loanCursor.close()
+
+        // Verify subscriptions table created and insertable
+        db.execSQL("INSERT INTO subscriptions (id, name, amount, category, paymentMode, billingCycle, dueDay, startDate, isActive, lastPaidDate) VALUES (1, 'Spotify', 9.99, 'Entertainment', 'ONLINE', 'MONTHLY', 5, 1700000000000, 1, NULL)")
+        val subCursor = db.query("SELECT name, amount, category, paymentMode, billingCycle, dueDay, startDate, isActive, lastPaidDate FROM subscriptions WHERE id = 1")
+        assertTrue(subCursor.moveToFirst())
+        assertEquals("Spotify", subCursor.getString(subCursor.getColumnIndexOrThrow("name")))
+        assertEquals(9.99, subCursor.getDouble(subCursor.getColumnIndexOrThrow("amount")), 0.001)
+        assertEquals("Entertainment", subCursor.getString(subCursor.getColumnIndexOrThrow("category")))
+        assertEquals("ONLINE", subCursor.getString(subCursor.getColumnIndexOrThrow("paymentMode")))
+        assertEquals(1, subCursor.getInt(subCursor.getColumnIndexOrThrow("isActive")))
+        assertTrue(subCursor.isNull(subCursor.getColumnIndexOrThrow("lastPaidDate")))
+        subCursor.close()
+    }
+
+    @Test
     fun migrateAll1To4() {
         var db = helper.createDatabase(TEST_DB, 1).apply {
             execSQL("INSERT INTO transactions (id, type, amount, tag, timestamp) VALUES (4, 'EXPENSE', 12.00, 'coffee', 1700000002000)")
@@ -110,5 +145,30 @@ class MigrationTest {
         assertEquals("", cursor.getString(cursor.getColumnIndexOrThrow("note")))
         assertEquals("ONLINE", cursor.getString(cursor.getColumnIndexOrThrow("paymentMode")))
         cursor.close()
+    }
+
+    @Test
+    fun migrateAll1To5() {
+        var db = helper.createDatabase(TEST_DB, 1).apply {
+            execSQL("INSERT INTO transactions (id, type, amount, tag, timestamp) VALUES (5, 'EXPENSE', 15.00, 'lunch', 1700000005000)")
+            close()
+        }
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+
+        val cursor = db.query("SELECT id, type, amount, tag, note, timestamp, paymentMode FROM transactions WHERE id = 5")
+        assertTrue(cursor.moveToFirst())
+        assertEquals(5L, cursor.getLong(cursor.getColumnIndexOrThrow("id")))
+        assertEquals("EXPENSE", cursor.getString(cursor.getColumnIndexOrThrow("type")))
+        assertEquals(15.00, cursor.getDouble(cursor.getColumnIndexOrThrow("amount")), 0.001)
+        assertEquals("lunch", cursor.getString(cursor.getColumnIndexOrThrow("tag")))
+        assertEquals("", cursor.getString(cursor.getColumnIndexOrThrow("note")))
+        assertEquals("ONLINE", cursor.getString(cursor.getColumnIndexOrThrow("paymentMode")))
+        cursor.close()
+
+        val subCursor = db.query("SELECT count(*) FROM subscriptions")
+        assertTrue(subCursor.moveToFirst())
+        assertEquals(0, subCursor.getInt(0))
+        subCursor.close()
     }
 }
