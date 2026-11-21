@@ -47,13 +47,13 @@ fun SettingsScreen(
                 context.packageManager.getPackageInfo(
                     context.packageName,
                     PackageManager.PackageInfoFlags.of(0)
-                ).versionName ?: "1.0.5"
+                ).versionName ?: "1.0.6"
             } else {
                 @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.5"
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.6"
             }
         } catch (_: Exception) {
-            "1.0.5"
+            "1.0.6"
         }
     }
     var showClearDialog by remember { mutableStateOf(false) }

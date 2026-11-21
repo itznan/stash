@@ -1,0 +1,8 @@
+Release v1.0.6:
+
+- Settings Redesign: Professional 4-section grouped architecture with M3 list tiles, leading icon bubbles, and action chevrons
+- Dynamic Color Toggle: Control Android wallpaper-based accents directly from Appearance settings
+- Backup Safety: Prevent database wipes on invalid or empty JSON restores
+- Widget Reliability: Asynchronous broadcast lifecycle protection ensuring widgets update without process interruption
+- Performance & Architecture: Redundant Room database queries eliminated and balance calculations unified
+- Zero network permissions, 100% offline and private
