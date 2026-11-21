@@ -1,0 +1,8 @@
+Release v1.0.4:
+
+- Printable PDF Statements: Generate clean, professionally formatted A4 financial statements with period summaries and ledger tables
+- Tactile Haptic Feedback: Added crisp tactile feedback across key interactions
+- Recurring Subscriptions: Track monthly subscriptions with due dates, monthly burn summaries, and one-tap payment logging
+- Android Home Screen Widget: Compact home screen widget displaying live Online & Cash balances with quick actions
+- Atomic Data Persistence: Room database schema v5 migration and unified backup support
+- Zero network permissions, 100% offline and private

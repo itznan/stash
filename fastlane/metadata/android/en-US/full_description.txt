@@ -5,9 +5,11 @@ Track daily expenses, incomes, bank-cash transfers, and peer-to-peer loans witho
 <b>Key Features:</b>
 • <b>100% Offline & Private</b>: Zero network permissions, zero tracking, zero ads. Your financial records stay exclusively on your device.
 • <b>Dual-Wallet Architecture</b>: Distinguish and balance Online Money (bank accounts) and Cash Available, with zero-distortion internal transfers.
-• <b>Lent Money & Debt Manager</b>: Track loans given to friends and family with due dates, direct Call/WhatsApp actions, and partial repayment logging.
-• <b>Native Keyboard Input</b>: Fast decimal numeric input using your device's software keyboard.
-• <b>Fluid 120Hz Animations</b>: Hardware-accelerated transitions and responsive charts optimized for LTPO displays.
-• <b>Biometric Protection</b>: Lock your sensitive ledger with fingerprint or device lock hardware authentication.
-• <b>Export & Restore</b>: Full control of your financial records with encrypted JSON backups and CSV exports for spreadsheet analysis.
-• <b>Dynamic Theming</b>: Seamlessly integrates with Android 12–15 Monet wallpaper colors in light and dark modes.
+• <b>Low Balance Warnings</b>: Configurable balance threshold warnings for Online and Cash wallets with visual dashboard alerts and expense overspending checks.
+• <b>Printable PDF Statements</b>: Generate clean, A4 financial statements with period summaries and categorized transaction ledgers ready to print or share.
+• <b>Subscriptions Tracker</b>: Monitor recurring monthly services with due dates, monthly burn rate totals, and one-tap payment logging.
+• <b>Home Screen Widget</b>: Live Online and Cash balance glances with quick-action shortcuts to add income, spend, or transfer funds.
+• <b>Lent Money & Debt Manager</b>: Track loans given to friends and family with due dates, direct communication actions, and partial repayment logging.
+• <b>Biometric Protection</b>: Lock your sensitive financial ledger with biometric or device lock hardware authentication.
+• <b>Export & Restore</b>: Full control of your records with local JSON backups and CSV exports for external spreadsheet analysis.
+• <b>Dynamic Material 3</b>: Fluid animations and dynamic Monet wallpaper-based theming in light and dark modes.
