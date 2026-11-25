@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nan.stash.data.model.PaymentMode
+import com.nan.stash.ui.components.sanitizeDecimalInput
 import com.nan.stash.ui.util.StashHaptics
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,10 +130,9 @@ fun LendMoneyBottomSheet(
             OutlinedTextField(
                 value = amountString,
                 onValueChange = { input ->
-                    val clean = input.replace(',', '.')
-                    if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                    sanitizeDecimalInput(input)?.let {
                         StashHaptics.keyTap(haptic)
-                        amountString = clean
+                        amountString = it
                     }
                 },
                 label = { Text("Lent Amount *") },

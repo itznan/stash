@@ -45,8 +45,10 @@ import androidx.compose.ui.unit.dp
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
+import com.nan.stash.ui.screens.home.TransactionRowCard
 import com.nan.stash.ui.theme.incomeColor
 import com.nan.stash.ui.theme.spendingColor
+import com.nan.stash.ui.util.AnalyticsCalculator
 import com.nan.stash.ui.util.DateUtils
 import java.util.Locale
 
@@ -81,7 +83,8 @@ fun HistoryScreen(
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 item.tag.contains(searchQuery, ignoreCase = true) ||
                         item.note.contains(searchQuery, ignoreCase = true) ||
-                        item.amount.toString().contains(searchQuery)
+                        item.amount.toString().contains(searchQuery) ||
+                        String.format(Locale.US, "%.2f", item.amount).contains(searchQuery)
             }
 
             matchesFilter && matchesSearch
@@ -216,14 +219,16 @@ fun HistoryScreen(
         } else {
             groupedTransactions.forEach { (dateKey, itemsInDay) ->
                 // Date Header
-                item {
-                    val dateHeaderLabel = remember(dateKey) {
-                        DateUtils.formatDateHeader(itemsInDay.first().timestamp)
-                    }
-                    val dayNet = remember(itemsInDay) {
-                        val inc = itemsInDay.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-                        val exp = itemsInDay.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-                        inc - exp
+                item(key = "header_$dateKey") {
+                    val dateHeaderLabel = DateUtils.formatDateHeader(itemsInDay.first().timestamp)
+                    val (dayNet, hasCashFlow) = remember(itemsInDay) {
+                        var incCents = 0L
+                        var expCents = 0L
+                        for (tx in itemsInDay) {
+                            if (tx.type == TransactionType.INCOME) incCents += AnalyticsCalculator.toCents(tx.amount)
+                            else if (tx.type == TransactionType.EXPENSE) expCents += AnalyticsCalculator.toCents(tx.amount)
+                        }
+                        AnalyticsCalculator.fromCents(incCents - expCents) to (incCents > 0L || expCents > 0L)
                     }
 
                     Row(
@@ -240,11 +245,20 @@ fun HistoryScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        val daySign = if (dayNet >= 0) "+" else "-"
-                        val dayColor = if (dayNet >= 0) MaterialTheme.colorScheme.incomeColor else MaterialTheme.colorScheme.spendingColor
+                        val dayNetCents = AnalyticsCalculator.toCents(dayNet)
+                        val dayColor = when {
+                            !hasCashFlow -> MaterialTheme.colorScheme.onSurfaceVariant
+                            dayNetCents >= 0L -> MaterialTheme.colorScheme.incomeColor
+                            else -> MaterialTheme.colorScheme.spendingColor
+                        }
+                        val dayLabel = if (hasCashFlow) {
+                            AnalyticsCalculator.formatSignedCurrency(dayNet, currencySymbol, showPlus = true)
+                        } else {
+                            "${currencySymbol}0.00"
+                        }
 
                         Text(
-                            text = "$daySign$currencySymbol${String.format(Locale.US, "%.2f", Math.abs(dayNet))}",
+                            text = dayLabel,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = dayColor
@@ -258,11 +272,12 @@ fun HistoryScreen(
                     key = { it.id },
                     contentType = { "history_item" }
                 ) { item ->
-                    HistoryItemCard(
+                    TransactionRowCard(
                         transaction = item,
                         currencySymbol = currencySymbol,
-                        onClick = { onTransactionClick(item) },
-                        onDelete = { onDeleteTransaction(item) }
+                        showTimeInsteadOfDate = true,
+                        onDelete = { onDeleteTransaction(item) },
+                        onClick = { onTransactionClick(item) }
                     )
                 }
             }

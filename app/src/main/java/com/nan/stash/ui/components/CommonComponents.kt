@@ -1,19 +1,9 @@
 package com.nan.stash.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.CardGiftcard
 import androidx.compose.material.icons.rounded.Category
@@ -29,18 +19,20 @@ import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+
+private val decimalInputRegex = Regex("""^\d*(\.\d{0,2})?$""")
+
+fun sanitizeDecimalInput(input: String): String? {
+    val clean = input.replace(',', '.')
+    return if (clean.isEmpty() || decimalInputRegex.matches(clean)) clean else null
+}
 
 fun getTagIcon(tag: String): ImageVector {
     val lower = tag.lowercase()
@@ -79,9 +71,6 @@ fun getTagColor(tag: String, colorScheme: ColorScheme): Color {
         else -> colorScheme.surfaceVariant
     }
 }
-
-@Composable
-fun getDynamicTagColor(tag: String): Color = getTagColor(tag, MaterialTheme.colorScheme)
 
 @Composable
 fun FilledIconButtonSmall(

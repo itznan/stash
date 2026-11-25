@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nan.stash.ui.theme.incomeColor
 import com.nan.stash.ui.theme.spendingColor
+import com.nan.stash.ui.util.AnalyticsCalculator
 import java.text.NumberFormat
 
 @Composable
@@ -110,9 +111,8 @@ fun HeroBalanceCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Bold oversized numerals
-            val formattedBalance = currencyFormatter.format(netBalance)
             Text(
-                text = "$currencySymbol$formattedBalance",
+                text = AnalyticsCalculator.formatSignedCurrency(netBalance, currencySymbol, currencyFormatter),
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-1.5).sp
@@ -194,11 +194,11 @@ fun HeroBalanceCard(
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        val onlineSign = if (onlineBalance < 0) "-" else ""
+                        val isOnlineNegative = AnalyticsCalculator.toCents(onlineBalance) < 0L
                         Text(
-                            text = "$onlineSign$currencySymbol${currencyFormatter.format(Math.abs(onlineBalance))}",
+                            text = AnalyticsCalculator.formatSignedCurrency(onlineBalance, currencySymbol, currencyFormatter),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (isOnlineLow || onlineBalance < 0) MaterialTheme.colorScheme.spendingColor else MaterialTheme.colorScheme.onSurface
+                            color = if (isOnlineLow || isOnlineNegative) MaterialTheme.colorScheme.spendingColor else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -270,11 +270,11 @@ fun HeroBalanceCard(
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        val cashSign = if (cashBalance < 0) "-" else ""
+                        val isCashNegative = AnalyticsCalculator.toCents(cashBalance) < 0L
                         Text(
-                            text = "$cashSign$currencySymbol${currencyFormatter.format(Math.abs(cashBalance))}",
+                            text = AnalyticsCalculator.formatSignedCurrency(cashBalance, currencySymbol, currencyFormatter),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (isCashLow || cashBalance < 0) MaterialTheme.colorScheme.spendingColor else MaterialTheme.colorScheme.onSurface
+                            color = if (isCashLow || isCashNegative) MaterialTheme.colorScheme.spendingColor else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }

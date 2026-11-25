@@ -1,5 +1,6 @@
 package com.nan.stash.ui.util
 
+import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
@@ -135,5 +136,78 @@ class AnalyticsCalculatorTest {
         assertTrue(AnalyticsCalculator.isLowBalance(balance = 25.0, threshold = 50.0, enabled = true))
         assertTrue(AnalyticsCalculator.isLowBalance(balance = 0.0, threshold = 50.0, enabled = true))
         assertTrue(AnalyticsCalculator.isLowBalance(balance = -10.0, threshold = 50.0, enabled = true))
+    }
+
+    @Test
+    fun calculateWalletBalances_avoidsFloatingPointDrift() {
+        val txs = listOf(
+            TransactionEntity(id = 1, type = TransactionType.INCOME, amount = 10.10, tag = "Salary", paymentMode = PaymentMode.ONLINE),
+            TransactionEntity(id = 2, type = TransactionType.INCOME, amount = 20.20, tag = "Gift", paymentMode = PaymentMode.ONLINE),
+            TransactionEntity(id = 3, type = TransactionType.EXPENSE, amount = 30.30, tag = "Food", paymentMode = PaymentMode.ONLINE)
+        )
+        val balances = AnalyticsCalculator.calculateWalletBalances(txs)
+        assertEquals(0.0, balances.onlineBalance, 0.0)
+        assertEquals(0.0, balances.netBalance, 0.0)
+        assertEquals("$0.00", AnalyticsCalculator.formatSignedCurrency(balances.onlineBalance, "$"))
+    }
+
+    @Test
+    fun formatSignedCurrency_placesSignBeforeCurrencySymbol() {
+        assertEquals("-$50.00", AnalyticsCalculator.formatSignedCurrency(-50.0, "$"))
+        assertEquals("$0.00", AnalyticsCalculator.formatSignedCurrency(-0.001, "$"))
+        assertEquals("+$25.50", AnalyticsCalculator.formatSignedCurrency(25.5, "$", showPlus = true))
+    }
+
+    @Test
+    fun categorySummaries_excludesPreviousMonthExpenses() {
+        val now = Calendar.getInstance()
+        val prevMonth = (now.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_MONTH, 15)
+            add(Calendar.MONTH, -1)
+        }
+        val txs = listOf(
+            TransactionEntity(id = 1, type = TransactionType.EXPENSE, amount = 60.0, tag = "Food", timestamp = now.timeInMillis),
+            TransactionEntity(id = 2, type = TransactionType.EXPENSE, amount = 400.0, tag = "Bills", timestamp = prevMonth.timeInMillis)
+        )
+        val summaries = AnalyticsCalculator.calculateCategorySummaries(txs)
+        assertEquals(1, summaries.size)
+        assertEquals("Food", summaries[0].tag)
+        assertEquals(60.0, summaries[0].amount, 0.001)
+        assertEquals(100.0f, summaries[0].percentage, 0.001f)
+    }
+
+    @Test
+    fun weeklyTrends_ignoresNonCashFlowTypesForHasActivity() {
+        val now = System.currentTimeMillis()
+        val txs = listOf(
+            TransactionEntity(id = 1, type = TransactionType.TRANSFER, amount = 100.0, tag = "Online → Cash", timestamp = now),
+            TransactionEntity(id = 2, type = TransactionType.LEND, amount = 50.0, tag = "Lent: Bob", timestamp = now),
+            TransactionEntity(id = 3, type = TransactionType.REPAYMENT, amount = 25.0, tag = "Repaid: Bob", timestamp = now)
+        )
+        val todayTrend = AnalyticsCalculator.calculateWeeklyTrends(txs).first { it.isToday }
+        assertFalse(todayTrend.hasActivity)
+        assertEquals(0.0, todayTrend.income, 0.001)
+        assertEquals(0.0, todayTrend.expense, 0.001)
+    }
+
+    @Test
+    fun loanHelpers_applyRepaymentAndAdditionalLoan() {
+        val loan = LoanEntity(id = 1, personName = "Alice", totalAmount = 100.0, remainingAmount = 100.0)
+        val partial = AnalyticsCalculator.applyRepayment(loan, 40.0)
+        assertEquals(60.0, partial.remainingAmount, 0.001)
+        assertFalse(partial.isSettled)
+
+        val settled = AnalyticsCalculator.applyRepayment(partial, 60.0)
+        assertEquals(0.0, settled.remainingAmount, 0.001)
+        assertTrue(settled.isSettled)
+
+        val overpaid = AnalyticsCalculator.applyRepayment(partial, 90.0)
+        assertEquals(0.0, overpaid.remainingAmount, 0.001)
+        assertTrue(overpaid.isSettled)
+
+        val addedMore = AnalyticsCalculator.applyAdditionalLoan(settled, 25.0)
+        assertEquals(125.0, addedMore.totalAmount, 0.001)
+        assertEquals(25.0, addedMore.remainingAmount, 0.001)
+        assertFalse(addedMore.isSettled)
     }
 }

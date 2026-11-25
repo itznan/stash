@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nan.stash.data.model.PaymentMode
+import com.nan.stash.ui.components.sanitizeDecimalInput
 import com.nan.stash.ui.util.StashHaptics
 import kotlinx.coroutines.delay
 
@@ -218,10 +219,9 @@ fun TransferMoneyBottomSheet(
             OutlinedTextField(
                 value = amountString,
                 onValueChange = { input ->
-                    val clean = input.replace(',', '.')
-                    if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                    sanitizeDecimalInput(input)?.let {
                         StashHaptics.keyTap(haptic)
-                        amountString = clean
+                        amountString = it
                     }
                 },
                 label = { Text("Transfer Amount") },

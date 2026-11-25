@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,10 +45,13 @@ fun TransactionRowCard(
     transaction: TransactionEntity,
     currencySymbol: String,
     modifier: Modifier = Modifier,
+    showTimeInsteadOfDate: Boolean = false,
+    onDelete: (() -> Unit)? = null,
     onClick: () -> Unit = {}
 ) {
-    val dateString = remember(transaction.timestamp) {
-        DateUtils.formatDate(transaction.timestamp)
+    val timeOrDateLabel = remember(transaction.timestamp, showTimeInsteadOfDate) {
+        if (showTimeInsteadOfDate) DateUtils.formatTime(transaction.timestamp)
+        else DateUtils.formatDate(transaction.timestamp)
     }
     val colorScheme = MaterialTheme.colorScheme
     val tagColor = remember(transaction.tag, colorScheme) { getTagColor(transaction.tag, colorScheme) }
@@ -74,7 +80,7 @@ fun TransactionRowCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(if (onDelete != null) 42.dp else 44.dp)
                         .clip(CircleShape)
                         .background(tagColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
@@ -83,11 +89,11 @@ fun TransactionRowCard(
                         imageVector = tagIcon,
                         contentDescription = transaction.tag,
                         tint = tagColor,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(if (onDelete != null) 20.dp else 22.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(if (onDelete != null) 12.dp else 14.dp))
 
                 Column {
                     Text(
@@ -102,36 +108,50 @@ fun TransactionRowCard(
                         if (transaction.paymentMode == PaymentMode.ONLINE) "Online" else "Cash"
                     }
                     Text(
-                        text = if (transaction.note.isNotBlank()) "${transaction.note} • $modeLabel • $dateString" else "$modeLabel • $dateString",
+                        text = if (transaction.note.isNotBlank()) "${transaction.note} • $modeLabel • $timeOrDateLabel" else "$modeLabel • $timeOrDateLabel",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            val sign = when (transaction.type) {
-                TransactionType.INCOME -> "+"
-                TransactionType.EXPENSE -> "-"
-                TransactionType.TRANSFER -> "⇄"
-                TransactionType.LEND -> "-"
-                TransactionType.REPAYMENT -> "+"
-            }
-            val amountColor = when (transaction.type) {
-                TransactionType.INCOME -> MaterialTheme.colorScheme.incomeColor
-                TransactionType.EXPENSE -> MaterialTheme.colorScheme.spendingColor
-                TransactionType.TRANSFER -> MaterialTheme.colorScheme.tertiary
-                TransactionType.LEND -> MaterialTheme.colorScheme.secondary
-                TransactionType.REPAYMENT -> MaterialTheme.colorScheme.primary
-            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val sign = when (transaction.type) {
+                    TransactionType.INCOME -> "+"
+                    TransactionType.EXPENSE -> "-"
+                    TransactionType.TRANSFER -> "⇄"
+                    TransactionType.LEND -> "-"
+                    TransactionType.REPAYMENT -> "+"
+                }
+                val amountColor = when (transaction.type) {
+                    TransactionType.INCOME -> MaterialTheme.colorScheme.incomeColor
+                    TransactionType.EXPENSE -> MaterialTheme.colorScheme.spendingColor
+                    TransactionType.TRANSFER -> MaterialTheme.colorScheme.tertiary
+                    TransactionType.LEND -> MaterialTheme.colorScheme.secondary
+                    TransactionType.REPAYMENT -> MaterialTheme.colorScheme.primary
+                }
 
-            Text(
-                text = "$sign$currencySymbol${String.format(Locale.US, "%.2f", transaction.amount)}",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
-                ),
-                color = amountColor
-            )
+                Text(
+                    text = "$sign$currencySymbol${String.format(Locale.US, "%.2f", transaction.amount)}",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (onDelete != null) 16.sp else 17.sp
+                    ),
+                    color = amountColor
+                )
+
+                if (onDelete != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.nan.stash
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -12,13 +13,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
-import androidx.fragment.app.FragmentActivity
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.nan.stash.ui.MainViewModel
 import com.nan.stash.ui.StashApp
@@ -26,6 +27,10 @@ import com.nan.stash.ui.components.BiometricLockScreen
 import com.nan.stash.ui.theme.StashTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import java.io.File
+
+private const val MAX_BACKUP_BYTES = 20 * 1024 * 1024
 
 class MainActivity : FragmentActivity() {
 
@@ -34,6 +39,56 @@ class MainActivity : FragmentActivity() {
     private var isAppUnlocked by mutableStateOf(false)
     private var isPromptShowing = false
     private var isLaunchingPicker = false
+    private var isExporting = false
+
+    private fun readTextBounded(uri: Uri): String? {
+        val declaredSize = contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+        if (declaredSize > MAX_BACKUP_BYTES) return null
+        contentResolver.openInputStream(uri)?.use { input ->
+            val buffer = ByteArray(8192)
+            val out = ByteArrayOutputStream()
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read == -1) break
+                total += read
+                if (total > MAX_BACKUP_BYTES) return null
+                out.write(buffer, 0, read)
+            }
+            return out.toString(Charsets.UTF_8.name())
+        }
+        return ""
+    }
+
+    private fun shareGeneratedFile(
+        mimeType: String,
+        chooserTitle: String,
+        toastPrefix: String,
+        errorPrefix: String,
+        generate: suspend () -> File
+    ) {
+        if (isExporting) return
+        isExporting = true
+        lifecycleScope.launch {
+            try {
+                val file = generate()
+                Toast.makeText(this@MainActivity, "$toastPrefix: ${file.name}", Toast.LENGTH_LONG).show()
+                val uri = FileProvider.getUriForFile(this@MainActivity, "com.nan.stash.provider", file)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = mimeType
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                isLaunchingPicker = true
+                startActivity(Intent.createChooser(shareIntent, chooserTitle))
+            } catch (e: Exception) {
+                isLaunchingPicker = false
+                Toast.makeText(this@MainActivity, "$errorPrefix: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isExporting = false
+            }
+        }
+    }
 
     private fun updateSecurityFlags(isBiometricEnabled: Boolean) {
         if (isBiometricEnabled) {
@@ -102,6 +157,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        isLaunchingPicker = false
+        viewModel.refreshDateIfNeeded()
         if (viewModel.isBiometricEnabledSync() && !isAppUnlocked && !isPromptShowing) {
             promptBiometric()
         }
@@ -185,7 +242,13 @@ class MainActivity : FragmentActivity() {
                 if (uri != null) {
                     lifecycleScope.launch(Dispatchers.IO) {
                         try {
-                            val content = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+                            val content = readTextBounded(uri)
+                            if (content == null) {
+                                runOnUiThread {
+                                    Toast.makeText(this@MainActivity, "Backup file is too large (max 20 MB)", Toast.LENGTH_LONG).show()
+                                }
+                                return@launch
+                            }
                             viewModel.restoreFromJson(content) { success, count ->
                                 runOnUiThread {
                                     if (success) {
@@ -248,54 +311,35 @@ class MainActivity : FragmentActivity() {
             }
 
             val onExportPdf: () -> Unit = {
-                try {
-                    val transactions = viewModel.transactions.value
-                    val file = viewModel.exportToPdf(transactions, settings.currencySymbol)
-                    Toast.makeText(this@MainActivity, "PDF generated: ${file.name}", Toast.LENGTH_LONG).show()
-                    val uri = FileProvider.getUriForFile(this@MainActivity, "com.nan.stash.provider", file)
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/pdf"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    isLaunchingPicker = true
-                    startActivity(Intent.createChooser(shareIntent, "Share Stash PDF Statement"))
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "PDF export failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                shareGeneratedFile(
+                    mimeType = "application/pdf",
+                    chooserTitle = "Share Stash PDF Statement",
+                    toastPrefix = "PDF generated",
+                    errorPrefix = "PDF export failed"
+                ) {
+                    viewModel.exportToPdf(viewModel.transactions.value, viewModel.settings.value.currencySymbol)
                 }
             }
 
             val onExportCsv: () -> Unit = {
-                try {
-                    val file = viewModel.exportToCsv(viewModel.transactions.value)
-                    Toast.makeText(this@MainActivity, "Exported: ${file.name}", Toast.LENGTH_LONG).show()
-                    val uri = FileProvider.getUriForFile(this@MainActivity, "com.nan.stash.provider", file)
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/csv"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    isLaunchingPicker = true
-                    startActivity(Intent.createChooser(shareIntent, "Share Stash CSV"))
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                shareGeneratedFile(
+                    mimeType = "text/csv",
+                    chooserTitle = "Share Stash CSV",
+                    toastPrefix = "Exported",
+                    errorPrefix = "Export failed"
+                ) {
+                    viewModel.exportToCsv(viewModel.transactions.value)
                 }
             }
 
             val onBackupJson: () -> Unit = {
-                try {
-                    val file = viewModel.createBackupJson()
-                    Toast.makeText(this@MainActivity, "Backup saved: ${file.name}", Toast.LENGTH_LONG).show()
-                    val uri = FileProvider.getUriForFile(this@MainActivity, "com.nan.stash.provider", file)
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/json"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    isLaunchingPicker = true
-                    startActivity(Intent.createChooser(shareIntent, "Share Stash Backup"))
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Backup failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                shareGeneratedFile(
+                    mimeType = "application/json",
+                    chooserTitle = "Share Stash Backup",
+                    toastPrefix = "Backup saved",
+                    errorPrefix = "Backup failed"
+                ) {
+                    viewModel.createBackupJson()
                 }
             }
 

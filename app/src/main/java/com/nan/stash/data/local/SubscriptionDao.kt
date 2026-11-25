@@ -28,7 +28,4 @@ interface SubscriptionDao {
 
     @Query("DELETE FROM subscriptions")
     suspend fun clearAllSubscriptions()
-
-    @Query("SELECT * FROM subscriptions WHERE id = :id LIMIT 1")
-    suspend fun getSubscriptionById(id: Long): SubscriptionEntity?
 }

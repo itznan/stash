@@ -2,7 +2,6 @@ package com.nan.stash.data.backup
 
 import android.content.ContentValues
 import android.content.Context
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.nan.stash.data.local.LoanEntity
@@ -10,11 +9,10 @@ import com.nan.stash.data.local.SubscriptionEntity
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
+import com.nan.stash.ui.util.DateUtils
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 data class RestoredBackupData(
@@ -25,34 +23,39 @@ data class RestoredBackupData(
 
 object BackupManager {
 
-    fun exportToCsv(context: Context, transactions: List<TransactionEntity>): File {
-        val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val filename = "stash_transactions_$timestampStr.csv"
+    private const val SHARE_CACHE_TTL_MS = 60 * 60 * 1000L
 
-        val sb = StringBuilder()
-        sb.append("ID,Type,Amount,Category,PaymentMode,Note,Date,Time\n")
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-
-        for (t in transactions) {
-            val d = Date(t.timestamp)
-            val cleanNote = t.note.replace("\"", "\"\"").replace("\n", " ")
-            val cleanTag = t.tag.replace("\"", "\"\"")
-            sb.append("${t.id},${t.type.name},${String.format(Locale.US, "%.2f", t.amount)},\"$cleanTag\",${t.paymentMode.name},\"$cleanNote\",${dateFormat.format(d)},${timeFormat.format(d)}\n")
+    internal fun createShareFile(context: Context, filename: String): File {
+        val dir = File(context.cacheDir, "exports")
+        if (!dir.exists()) dir.mkdirs()
+        val cutoff = System.currentTimeMillis() - SHARE_CACHE_TTL_MS
+        dir.listFiles()?.forEach { existing ->
+            if (existing.lastModified() < cutoff) existing.delete()
         }
-
-        return saveFileToStorage(context, filename, sb.toString())
+        return File(dir, filename)
     }
 
-    fun createBackupJson(
-        context: Context,
+    fun buildCsvContent(transactions: List<TransactionEntity>): String {
+        val sb = StringBuilder()
+        sb.append("ID,Type,Amount,Category,PaymentMode,Note,Date,Time\n")
+        for (t in transactions) {
+            val cleanNote = t.note.replace("\"", "\"\"").replace("\r", " ").replace("\n", " ")
+            val cleanTag = t.tag.replace("\"", "\"\"").replace("\r", " ").replace("\n", " ")
+            sb.append("${t.id},${t.type.name},${String.format(Locale.US, "%.2f", t.amount)},\"$cleanTag\",${t.paymentMode.name},\"$cleanNote\",${DateUtils.formatDateKey(t.timestamp)},${DateUtils.formatTime(t.timestamp)}\n")
+        }
+        return sb.toString()
+    }
+
+    fun exportToCsv(context: Context, transactions: List<TransactionEntity>): File {
+        val filename = "stash_transactions_${DateUtils.formatFileTimestamp()}.csv"
+        return saveFileToStorage(context, filename, buildCsvContent(transactions))
+    }
+
+    fun buildBackupJsonContent(
         transactions: List<TransactionEntity>,
         loans: List<LoanEntity>,
         subscriptions: List<SubscriptionEntity>
-    ): File {
-        val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val filename = "stash_backup_$timestampStr.json"
-
+    ): String {
         val root = JSONObject()
         root.put("version", 3)
         root.put("appName", "Stash")
@@ -110,7 +113,24 @@ object BackupManager {
         }
         root.put("subscriptions", subArray)
 
-        return saveFileToStorage(context, filename, root.toString(2))
+        return root.toString(2)
+    }
+
+    fun createBackupJson(
+        context: Context,
+        transactions: List<TransactionEntity>,
+        loans: List<LoanEntity>,
+        subscriptions: List<SubscriptionEntity>
+    ): File {
+        val filename = "stash_backup_${DateUtils.formatFileTimestamp()}.json"
+        return saveFileToStorage(context, filename, buildBackupJsonContent(transactions, loans, subscriptions))
+    }
+
+    private fun requirePositiveAmount(amount: Double, label: String): Double {
+        if (!amount.isFinite() || amount <= 0.0) {
+            throw IllegalArgumentException("Invalid $label amount: $amount")
+        }
+        return amount
     }
 
     fun parseBackupJson(jsonString: String): RestoredBackupData {
@@ -125,14 +145,16 @@ object BackupManager {
             val txArray = root.getJSONArray("transactions")
             for (i in 0 until txArray.length()) {
                 val obj = txArray.getJSONObject(i)
-                val type = try { TransactionType.valueOf(obj.getString("type")) } catch (_: Exception) { TransactionType.EXPENSE }
-                val paymentMode = try { PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE")) } catch (_: Exception) { PaymentMode.ONLINE }
+                val type = TransactionType.valueOf(obj.getString("type"))
+                val paymentMode = PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE"))
+                val tag = obj.getString("tag").trim()
+                if (tag.isBlank()) throw IllegalArgumentException("Transaction tag cannot be blank")
                 txList.add(
                     TransactionEntity(
                         id = 0,
                         type = type,
-                        amount = obj.getDouble("amount"),
-                        tag = obj.getString("tag"),
+                        amount = requirePositiveAmount(obj.getDouble("amount"), "transaction"),
+                        tag = tag,
                         note = obj.optString("note", ""),
                         timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                         paymentMode = paymentMode
@@ -146,19 +168,21 @@ object BackupManager {
             val loanArray = root.getJSONArray("loans")
             for (i in 0 until loanArray.length()) {
                 val obj = loanArray.getJSONObject(i)
-                val paymentMode = try {
-                    PaymentMode.valueOf(obj.optString("initialPaymentMode", "CASH"))
-                } catch (_: Exception) {
-                    PaymentMode.CASH
+                val personName = obj.getString("personName").trim()
+                if (personName.isBlank()) throw IllegalArgumentException("Loan personName cannot be blank")
+                val paymentMode = PaymentMode.valueOf(obj.optString("initialPaymentMode", "CASH"))
+                val remaining = obj.getDouble("remainingAmount")
+                if (!remaining.isFinite() || remaining < 0.0) {
+                    throw IllegalArgumentException("Invalid loan remainingAmount: $remaining")
                 }
                 val dueDate = if (obj.has("dueDate") && !obj.isNull("dueDate")) obj.getLong("dueDate") else null
                 loanList.add(
                     LoanEntity(
                         id = 0,
-                        personName = obj.getString("personName"),
+                        personName = personName,
                         phoneNumber = obj.optString("phoneNumber", ""),
-                        totalAmount = obj.getDouble("totalAmount"),
-                        remainingAmount = obj.getDouble("remainingAmount"),
+                        totalAmount = requirePositiveAmount(obj.getDouble("totalAmount"), "loan total"),
+                        remainingAmount = remaining,
                         reason = obj.optString("reason", ""),
                         lendDate = obj.optLong("lendDate", System.currentTimeMillis()),
                         dueDate = dueDate,
@@ -174,21 +198,19 @@ object BackupManager {
             val subArray = root.getJSONArray("subscriptions")
             for (i in 0 until subArray.length()) {
                 val obj = subArray.getJSONObject(i)
-                val paymentMode = try {
-                    PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE"))
-                } catch (_: Exception) {
-                    PaymentMode.ONLINE
-                }
+                val name = obj.getString("name").trim()
+                if (name.isBlank()) throw IllegalArgumentException("Subscription name cannot be blank")
+                val paymentMode = PaymentMode.valueOf(obj.optString("paymentMode", "ONLINE"))
                 val lastPaid = if (obj.has("lastPaidDate") && !obj.isNull("lastPaidDate")) obj.getLong("lastPaidDate") else null
                 subList.add(
                     SubscriptionEntity(
                         id = 0,
-                        name = obj.getString("name"),
-                        amount = obj.getDouble("amount"),
+                        name = name,
+                        amount = requirePositiveAmount(obj.getDouble("amount"), "subscription"),
                         category = obj.optString("category", "Bills"),
                         paymentMode = paymentMode,
                         billingCycle = obj.optString("billingCycle", "MONTHLY"),
-                        dueDay = obj.optInt("dueDay", 1),
+                        dueDay = obj.optInt("dueDay", 1).coerceIn(1, 31),
                         startDate = obj.optLong("startDate", System.currentTimeMillis()),
                         isActive = obj.optBoolean("isActive", true),
                         lastPaidDate = lastPaid
@@ -205,10 +227,8 @@ object BackupManager {
     }
 
     private fun saveFileToStorage(context: Context, filename: String, content: String): File {
-        // App-scoped file for FileProvider sharing
-        val targetDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-        if (!targetDir.exists()) targetDir.mkdirs()
-        val file = File(targetDir, filename)
+        // Ephemeral cache file for FileProvider sharing (pruned automatically)
+        val file = createShareFile(context, filename)
         file.writeText(content)
 
         // Save a permanent copy to public Downloads so backups survive app uninstall

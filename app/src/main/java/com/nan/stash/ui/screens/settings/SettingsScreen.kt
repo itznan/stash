@@ -140,7 +140,7 @@ fun SettingsScreen(
                 }
             },
             title = { Text("Reset All Data?") },
-            text = { Text("This will permanently delete all recorded transactions from this device.") }
+            text = { Text("This will permanently delete all transactions, lent money records, and subscriptions from this device.") }
         )
     }
 }

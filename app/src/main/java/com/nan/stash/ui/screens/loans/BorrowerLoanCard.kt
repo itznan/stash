@@ -44,8 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.ui.components.FilledIconButtonSmall
-import java.text.SimpleDateFormat
-import java.util.Date
+import com.nan.stash.ui.util.DateUtils
 import java.util.Locale
 
 @Composable
@@ -58,10 +57,9 @@ fun BorrowerLoanCard(
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-    val lendDateStr = remember(loan.lendDate) { dateFormat.format(Date(loan.lendDate)) }
+    val lendDateStr = remember(loan.lendDate) { DateUtils.formatDate(loan.lendDate) }
     val dueDateStr = remember(loan.dueDate) {
-        loan.dueDate?.let { dateFormat.format(Date(it)) }
+        loan.dueDate?.let { DateUtils.formatDate(it) }
     }
 
     val isOverdue = remember(loan.dueDate, loan.isSettled) {
@@ -238,7 +236,7 @@ fun BorrowerLoanCard(
             ) {
                 // If phone is available, offer direct call and WhatsApp
                 if (loan.phoneNumber.isNotBlank()) {
-                    val cleanPhone = loan.phoneNumber.replace(" ", "").replace("-", "")
+                    val dialNumber = loan.phoneNumber.filter { it.isDigit() || it == '+' }
 
                     // Direct Call Button
                     FilledIconButtonSmall(
@@ -248,7 +246,7 @@ fun BorrowerLoanCard(
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         onClick = {
                             try {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone"))
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$dialNumber"))
                                 context.startActivity(intent)
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Could not open dialer: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -264,7 +262,7 @@ fun BorrowerLoanCard(
                         contentColor = Color(0xFF25D366),
                         onClick = {
                             try {
-                                val waNumber = cleanPhone.replace("+", "")
+                                val waNumber = loan.phoneNumber.filter { it.isDigit() }
                                 val message = "Hi ${loan.personName}, this is a reminder regarding the $currencySymbol${String.format(Locale.US, "%.2f", loan.remainingAmount)} from our loan."
                                 val uri = Uri.parse("https://api.whatsapp.com/send?phone=$waNumber&text=${Uri.encode(message)}")
                                 val intent = Intent(Intent.ACTION_VIEW, uri)

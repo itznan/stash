@@ -38,17 +38,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.CategorySummary
 import com.nan.stash.data.model.MonthComparison
-import com.nan.stash.data.model.TransactionType
+import com.nan.stash.ui.util.AnalyticsCalculator
 import java.text.NumberFormat
 import java.util.Locale
 
 @Composable
 fun TagsScreen(
     innerPadding: PaddingValues,
-    transactions: List<TransactionEntity>,
     categorySummaries: List<CategorySummary>,
     monthComparison: MonthComparison,
     currencySymbol: String,
@@ -56,8 +54,8 @@ fun TagsScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedAnalysisTab by remember { mutableIntStateOf(0) }
-    val totalExpense = remember(transactions) {
-        transactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
+    val totalExpense = remember(categorySummaries) {
+        AnalyticsCalculator.fromCents(categorySummaries.sumOf { AnalyticsCalculator.toCents(it.amount) })
     }
 
     val currencyFormatter = remember(currencySymbol) {

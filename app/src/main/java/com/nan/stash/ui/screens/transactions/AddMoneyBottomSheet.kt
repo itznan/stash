@@ -52,12 +52,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
+import com.nan.stash.ui.components.sanitizeDecimalInput
 import com.nan.stash.ui.theme.incomeColor
+import com.nan.stash.ui.util.DateUtils
 import com.nan.stash.ui.util.StashHaptics
 import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,10 +121,9 @@ fun AddMoneyBottomSheet(
             OutlinedTextField(
                 value = amountString,
                 onValueChange = { input ->
-                    val clean = input.replace(',', '.')
-                    if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                    sanitizeDecimalInput(input)?.let {
                         StashHaptics.keyTap(haptic)
-                        amountString = clean
+                        amountString = it
                     }
                 },
                 label = { Text("Income Amount") },
@@ -246,7 +244,7 @@ fun AddMoneyBottomSheet(
 
             // Date Row
             val dateLabel = remember(selectedTimestamp) {
-                SimpleDateFormat("EEE, MMM dd", Locale.getDefault()).format(Date(selectedTimestamp))
+                DateUtils.formatShortDate(selectedTimestamp)
             }
             Surface(
                 shape = CircleShape,

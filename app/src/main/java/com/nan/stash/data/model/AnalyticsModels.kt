@@ -28,6 +28,5 @@ data class MonthComparison(
     val currentNet: Double = 0.0,
     val previousNet: Double = 0.0,
     val expenseDiffPercentage: Float = 0f,
-    val incomeDiffPercentage: Float = 0f,
-    val hasComparisonData: Boolean = false
+    val incomeDiffPercentage: Float = 0f
 )

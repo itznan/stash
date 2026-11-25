@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.data.model.PaymentMode
+import com.nan.stash.ui.components.sanitizeDecimalInput
 import java.util.Locale
 
 @Composable
@@ -53,10 +54,7 @@ fun RepaymentDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { input ->
-                        val clean = input.replace(',', '.')
-                        if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
-                            amountText = clean
-                        }
+                        sanitizeDecimalInput(input)?.let { amountText = it }
                     },
                     label = { Text("Amount ($currencySymbol)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -147,8 +145,11 @@ fun AddMoreLoanDialog(
 
                 OutlinedTextField(
                     value = amountText,
-                    onValueChange = { amountText = it },
+                    onValueChange = { input ->
+                        sanitizeDecimalInput(input)?.let { amountText = it }
+                    },
                     label = { Text("Additional Amount ($currencySymbol)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()

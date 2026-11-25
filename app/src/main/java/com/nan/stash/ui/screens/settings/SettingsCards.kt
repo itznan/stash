@@ -50,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -64,6 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nan.stash.data.local.ThemeMode
+import com.nan.stash.ui.components.sanitizeDecimalInput
 import com.nan.stash.ui.util.StashHaptics
 import java.util.Locale
 
@@ -364,14 +367,6 @@ fun SecurityAlertsSettingsCard(
     onCashThresholdChange: (Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptic = LocalHapticFeedback.current
-    var onlineInput by remember(lowOnlineThreshold) {
-        mutableStateOf(if (lowOnlineThreshold > 0.0) String.format(Locale.US, "%.2f", lowOnlineThreshold).trimEnd('0').trimEnd('.') else "")
-    }
-    var cashInput by remember(lowCashThreshold) {
-        mutableStateOf(if (lowCashThreshold > 0.0) String.format(Locale.US, "%.2f", lowCashThreshold).trimEnd('0').trimEnd('.') else "")
-    }
-
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -415,115 +410,109 @@ fun SecurityAlertsSettingsCard(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 Column(modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)) {
-                    // Online threshold
-                    Text(
-                        text = "Online Money Alert Threshold",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                    ThresholdInputSection(
+                        title = "Online Money Alert Threshold",
+                        subtitle = "Trigger alert when Online Money falls to or below this amount",
+                        threshold = lowOnlineThreshold,
+                        presets = listOf(25.0, 50.0, 100.0, 250.0, 500.0),
+                        currencySymbol = currencySymbol,
+                        onThresholdChange = onOnlineThresholdChange
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Trigger alert when Online Money falls to or below this amount",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = onlineInput,
-                        onValueChange = { input ->
-                            val clean = input.replace(',', '.')
-                            if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
-                                onlineInput = clean
-                                val amt = clean.toDoubleOrNull() ?: 0.0
-                                onOnlineThresholdChange(amt)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("0.00") },
-                        prefix = { Text("$currencySymbol ") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val onlinePresets = listOf(25.0, 50.0, 100.0, 250.0, 500.0)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        onlinePresets.forEach { preset ->
-                            FilterChip(
-                                selected = lowOnlineThreshold == preset,
-                                onClick = {
-                                    StashHaptics.keyTap(haptic)
-                                    onOnlineThresholdChange(preset)
-                                    onlineInput = String.format(Locale.US, "%.0f", preset)
-                                },
-                                label = { Text("$currencySymbol${preset.toInt()}", fontWeight = FontWeight.SemiBold) },
-                                shape = CircleShape
-                            )
-                        }
-                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Cash threshold
-                    Text(
-                        text = "Cash Available Alert Threshold",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                    ThresholdInputSection(
+                        title = "Cash Available Alert Threshold",
+                        subtitle = "Trigger alert when Cash Available falls to or below this amount",
+                        threshold = lowCashThreshold,
+                        presets = listOf(10.0, 20.0, 50.0, 100.0, 200.0),
+                        currencySymbol = currencySymbol,
+                        onThresholdChange = onCashThresholdChange
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Trigger alert when Cash Available falls to or below this amount",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = cashInput,
-                        onValueChange = { input ->
-                            val clean = input.replace(',', '.')
-                            if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
-                                cashInput = clean
-                                val amt = clean.toDoubleOrNull() ?: 0.0
-                                onCashThresholdChange(amt)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("0.00") },
-                        prefix = { Text("$currencySymbol ") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val cashPresets = listOf(10.0, 20.0, 50.0, 100.0, 200.0)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        cashPresets.forEach { preset ->
-                            FilterChip(
-                                selected = lowCashThreshold == preset,
-                                onClick = {
-                                    StashHaptics.keyTap(haptic)
-                                    onCashThresholdChange(preset)
-                                    cashInput = String.format(Locale.US, "%.0f", preset)
-                                },
-                                label = { Text("$currencySymbol${preset.toInt()}", fontWeight = FontWeight.SemiBold) },
-                                shape = CircleShape
-                            )
-                        }
-                    }
                 }
             }
+        }
+    }
+}
+
+private fun formatThresholdText(value: Double): String {
+    return if (value > 0.0) String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.') else ""
+}
+
+@Composable
+private fun ThresholdInputSection(
+    title: String,
+    subtitle: String,
+    threshold: Double,
+    presets: List<Double>,
+    currencySymbol: String,
+    onThresholdChange: (Double) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var inputText by remember { mutableStateOf(formatThresholdText(threshold)) }
+    var isFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(threshold) {
+        if (!isFocused) {
+            inputText = formatThresholdText(threshold)
+        }
+    }
+
+    Text(
+        text = title,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+    Spacer(modifier = Modifier.height(2.dp))
+    Text(
+        text = subtitle,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    OutlinedTextField(
+        value = inputText,
+        onValueChange = { input ->
+            val clean = sanitizeDecimalInput(input)
+            if (clean != null) {
+                inputText = clean
+                onThresholdChange(clean.toDoubleOrNull() ?: 0.0)
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+                if (!focusState.isFocused) {
+                    inputText = formatThresholdText(threshold)
+                }
+            },
+        placeholder = { Text("0.00") },
+        prefix = { Text("$currencySymbol ") },
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        presets.forEach { preset ->
+            FilterChip(
+                selected = threshold == preset,
+                onClick = {
+                    StashHaptics.keyTap(haptic)
+                    onThresholdChange(preset)
+                    inputText = String.format(Locale.US, "%.0f", preset)
+                },
+                label = { Text("$currencySymbol${preset.toInt()}", fontWeight = FontWeight.SemiBold) },
+                shape = CircleShape
+            )
         }
     }
 }
@@ -686,14 +675,14 @@ fun AboutAndPrivacySettingsCard(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Reset All Transactions",
+                                text = "Reset All Data",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.error
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Permanently wipe all transaction records stored on device",
+                                text = "Permanently wipe all transactions, loans, and subscriptions on this device",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

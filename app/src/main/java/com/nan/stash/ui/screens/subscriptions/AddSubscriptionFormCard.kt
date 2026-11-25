@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nan.stash.data.model.PaymentMode
+import com.nan.stash.ui.components.sanitizeDecimalInput
 import com.nan.stash.ui.util.StashHaptics
 
 @Composable
@@ -45,7 +46,6 @@ fun AddSubscriptionFormCard(
     val haptic = LocalHapticFeedback.current
     var newName by remember { mutableStateOf("") }
     var newAmount by remember { mutableStateOf("") }
-    var newCategory by remember { mutableStateOf("Bills") }
     var newMode by remember { mutableStateOf(PaymentMode.ONLINE) }
     var newDueDay by remember { mutableIntStateOf(1) }
 
@@ -69,10 +69,9 @@ fun AddSubscriptionFormCard(
             OutlinedTextField(
                 value = newAmount,
                 onValueChange = { input ->
-                    val clean = input.replace(',', '.')
-                    if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                    sanitizeDecimalInput(input)?.let {
                         StashHaptics.keyTap(haptic)
-                        newAmount = clean
+                        newAmount = it
                     }
                 },
                 label = { Text("Amount") },
@@ -126,7 +125,7 @@ fun AddSubscriptionFormCard(
                 onClick = {
                     StashHaptics.buttonClick(haptic)
                     val amount = newAmount.toDoubleOrNull() ?: 0.0
-                    onSaveSubscription(newName.trim(), amount, newCategory, newMode, newDueDay)
+                    onSaveSubscription(newName.trim(), amount, "Bills", newMode, newDueDay)
                     newName = ""
                     newAmount = ""
                 },

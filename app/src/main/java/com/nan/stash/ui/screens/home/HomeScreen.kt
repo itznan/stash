@@ -27,6 +27,7 @@ import com.nan.stash.data.local.SubscriptionEntity
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.DayTrend
 import com.nan.stash.ui.util.AnalyticsCalculator
+import com.nan.stash.ui.util.WalletBalances
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -34,6 +35,7 @@ import java.util.Locale
 fun HomeScreen(
     innerPadding: PaddingValues,
     transactions: List<TransactionEntity>,
+    balances: WalletBalances,
     currencySymbol: String,
     weeklyTrends: List<DayTrend>,
     onSeeAllClick: () -> Unit,
@@ -47,9 +49,6 @@ fun HomeScreen(
     lowOnlineThreshold: Double = 0.0,
     lowCashThreshold: Double = 0.0
 ) {
-    val balances = remember(transactions) {
-        AnalyticsCalculator.calculateWalletBalances(transactions)
-    }
 
     val isOnlineLow = remember(balances.onlineBalance, lowOnlineThreshold, lowBalanceWarningEnabled) {
         AnalyticsCalculator.isLowBalance(balances.onlineBalance, lowOnlineThreshold, lowBalanceWarningEnabled)

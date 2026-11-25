@@ -10,36 +10,40 @@ object DateUtils {
     private val zoneId: ZoneId get() = ZoneId.systemDefault()
 
     private val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy", Locale.US)
+    private val shortDateFormatter = DateTimeFormatter.ofPattern("EEE, MMM dd", Locale.US)
     private val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
+    private val dateTimeFormatter = DateTimeFormatter.ofPattern("EEE, MMM dd, yyyy • hh:mm a", Locale.US)
+    private val pdfDateTimeFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy • hh:mm a", Locale.US)
     private val headerFormatter = DateTimeFormatter.ofPattern("EEE, MMM dd, yyyy", Locale.US)
     private val dateKeyFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
+    private val monthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
+    private val fileTimestampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.US)
 
-    fun formatDateKey(timestamp: Long): String {
+    private fun format(timestamp: Long, formatter: DateTimeFormatter, fallback: String = ""): String {
         return try {
-            val zdt = Instant.ofEpochMilli(timestamp).atZone(zoneId)
-            dateKeyFormatter.format(zdt)
+            formatter.format(Instant.ofEpochMilli(timestamp).atZone(zoneId))
         } catch (_: Exception) {
-            ""
+            fallback
         }
     }
 
-    fun formatDate(timestamp: Long): String {
-        return try {
-            val zdt = Instant.ofEpochMilli(timestamp).atZone(zoneId)
-            dateFormatter.format(zdt)
-        } catch (_: Exception) {
-            ""
-        }
-    }
+    fun formatDateKey(timestamp: Long): String = format(timestamp, dateKeyFormatter)
 
-    fun formatTime(timestamp: Long): String {
-        return try {
-            val zdt = Instant.ofEpochMilli(timestamp).atZone(zoneId)
-            timeFormatter.format(zdt)
-        } catch (_: Exception) {
-            ""
-        }
-    }
+    fun formatDate(timestamp: Long): String = format(timestamp, dateFormatter)
+
+    fun formatShortDate(timestamp: Long): String = format(timestamp, shortDateFormatter)
+
+    fun formatTime(timestamp: Long): String = format(timestamp, timeFormatter)
+
+    fun formatDateTime(timestamp: Long): String = format(timestamp, dateTimeFormatter)
+
+    fun formatPdfDateTime(timestamp: Long): String = format(timestamp, pdfDateTimeFormatter)
+
+    fun formatMonthYear(timestamp: Long): String =
+        format(timestamp, monthYearFormatter.withLocale(Locale.getDefault()))
+
+    fun formatFileTimestamp(timestamp: Long = System.currentTimeMillis()): String =
+        format(timestamp, fileTimestampFormatter)
 
     fun formatDateHeader(timestamp: Long): String {
         return try {

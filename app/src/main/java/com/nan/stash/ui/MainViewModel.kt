@@ -18,21 +18,21 @@ import com.nan.stash.data.model.MonthComparison
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
 import com.nan.stash.ui.util.AnalyticsCalculator
+import com.nan.stash.ui.util.DateUtils
 import com.nan.stash.ui.util.PdfStatementGenerator
+import com.nan.stash.ui.util.WalletBalances
 import com.nan.stash.ui.widget.StashWidgetProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
-
-// Backward compatibility typealiases
-typealias CategorySummary = com.nan.stash.data.model.CategorySummary
-typealias DayTrend = com.nan.stash.data.model.DayTrend
-typealias MonthComparison = com.nan.stash.data.model.MonthComparison
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -41,6 +41,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val loanDao = db.loanDao()
     private val subscriptionDao = db.subscriptionDao()
     private val settingsDataStore = SettingsDataStore(application)
+    private val currentDayKey = MutableStateFlow(DateUtils.formatDateKey(System.currentTimeMillis()))
 
     val transactions: StateFlow<List<TransactionEntity>> = dao.getAllTransactions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -60,18 +61,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun isBiometricEnabledSync(): Boolean = settingsDataStore.isBiometricEnabledSync()
 
-    val weeklyTrends: StateFlow<List<DayTrend>> = transactions
-        .map { AnalyticsCalculator.calculateWeeklyTrends(it) }
+    fun refreshDateIfNeeded() {
+        val today = DateUtils.formatDateKey(System.currentTimeMillis())
+        if (currentDayKey.value != today) {
+            currentDayKey.value = today
+        }
+    }
+
+    val balances: StateFlow<WalletBalances> = transactions
+        .map { AnalyticsCalculator.calculateWalletBalances(it) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WalletBalances())
+
+    val weeklyTrends: StateFlow<List<DayTrend>> = combine(transactions, currentDayKey) { txs, _ ->
+        AnalyticsCalculator.calculateWeeklyTrends(txs)
+    }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val categorySummaries: StateFlow<List<CategorySummary>> = transactions
-        .map { AnalyticsCalculator.calculateCategorySummaries(it) }
+    val categorySummaries: StateFlow<List<CategorySummary>> = combine(transactions, currentDayKey) { txs, _ ->
+        AnalyticsCalculator.calculateCategorySummaries(txs)
+    }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val monthComparison: StateFlow<MonthComparison> = transactions
-        .map { AnalyticsCalculator.calculateMonthComparison(it) }
+    val monthComparison: StateFlow<MonthComparison> = combine(transactions, currentDayKey) { txs, _ ->
+        AnalyticsCalculator.calculateMonthComparison(txs)
+    }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthComparison())
 
@@ -129,20 +145,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (amountRepaid <= 0.0) return
         viewModelScope.launch {
             db.withTransaction {
-                val newRemaining = (loan.remainingAmount - amountRepaid).coerceAtLeast(0.0)
-                val settled = newRemaining <= 0.009
-                val updatedLoan = loan.copy(
-                    remainingAmount = newRemaining,
-                    isSettled = settled
-                )
-                loanDao.updateLoan(updatedLoan)
+                val currentLoan = loanDao.getLoanById(loan.id) ?: return@withTransaction
+                loanDao.updateLoan(AnalyticsCalculator.applyRepayment(currentLoan, amountRepaid))
 
-                val repaymentNote = if (note.isNotBlank()) note else "Repayment from ${loan.personName}"
+                val repaymentNote = if (note.isNotBlank()) note else "Repayment from ${currentLoan.personName}"
                 dao.insertTransaction(
                     TransactionEntity(
                         type = TransactionType.REPAYMENT,
                         amount = amountRepaid,
-                        tag = "Repaid: ${loan.personName}",
+                        tag = "Repaid: ${currentLoan.personName}",
                         note = repaymentNote,
                         timestamp = System.currentTimeMillis(),
                         paymentMode = paymentMode
@@ -162,19 +173,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (additionalAmount <= 0.0) return
         viewModelScope.launch {
             db.withTransaction {
-                val updatedLoan = loan.copy(
-                    totalAmount = loan.totalAmount + additionalAmount,
-                    remainingAmount = loan.remainingAmount + additionalAmount,
-                    isSettled = false
-                )
-                loanDao.updateLoan(updatedLoan)
+                val currentLoan = loanDao.getLoanById(loan.id) ?: return@withTransaction
+                loanDao.updateLoan(AnalyticsCalculator.applyAdditionalLoan(currentLoan, additionalAmount))
 
-                val lendNote = if (note.isNotBlank()) note else "Additional loan to ${loan.personName}"
+                val lendNote = if (note.isNotBlank()) note else "Additional loan to ${currentLoan.personName}"
                 dao.insertTransaction(
                     TransactionEntity(
                         type = TransactionType.LEND,
                         amount = additionalAmount,
-                        tag = "Lent: ${loan.personName}",
+                        tag = "Lent: ${currentLoan.personName}",
                         note = lendNote,
                         timestamp = System.currentTimeMillis(),
                         paymentMode = paymentMode
@@ -278,12 +285,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateSubscription(subscription: SubscriptionEntity) {
-        viewModelScope.launch {
-            subscriptionDao.updateSubscription(subscription)
-        }
-    }
-
     fun deleteSubscription(subscription: SubscriptionEntity) {
         viewModelScope.launch {
             subscriptionDao.deleteSubscription(subscription)
@@ -309,6 +310,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             }
+            notifyWidgetUpdate()
+        }
+    }
+
+    fun clearTransactions() {
+        viewModelScope.launch {
+            dao.clearAllTransactions()
             notifyWidgetUpdate()
         }
     }
@@ -339,6 +347,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setCurrencySymbol(symbol: String) {
         viewModelScope.launch {
             settingsDataStore.setCurrencySymbol(symbol)
+            notifyWidgetUpdate()
         }
     }
 
@@ -366,33 +375,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Helper functions delegation
-    fun calculateCategorySummaries(transactions: List<TransactionEntity>): List<CategorySummary> =
-        AnalyticsCalculator.calculateCategorySummaries(transactions)
-
-    fun calculateWeeklyTrends(transactions: List<TransactionEntity>): List<DayTrend> =
-        AnalyticsCalculator.calculateWeeklyTrends(transactions)
-
-    fun calculateMonthComparison(transactions: List<TransactionEntity>): MonthComparison =
-        AnalyticsCalculator.calculateMonthComparison(transactions)
-
     // Export & Backup
-    fun exportToCsv(transactions: List<TransactionEntity>): File =
-        BackupManager.exportToCsv(getApplication(), transactions)
+    suspend fun exportToCsv(transactions: List<TransactionEntity>): File =
+        withContext(Dispatchers.IO) {
+            BackupManager.exportToCsv(getApplication(), transactions)
+        }
 
-    fun exportToPdf(transactions: List<TransactionEntity>, currencySymbol: String): File =
-        PdfStatementGenerator.generateStatement(getApplication(), transactions, currencySymbol)
+    suspend fun exportToPdf(transactions: List<TransactionEntity>, currencySymbol: String): File =
+        withContext(Dispatchers.IO) {
+            PdfStatementGenerator.generateStatement(getApplication(), transactions, currencySymbol)
+        }
 
-    fun createBackupJson(
+    suspend fun createBackupJson(
         transactions: List<TransactionEntity> = this.transactions.value,
         loans: List<LoanEntity> = this.loans.value,
         subscriptions: List<SubscriptionEntity> = this.subscriptions.value
-    ): File = BackupManager.createBackupJson(getApplication(), transactions, loans, subscriptions)
+    ): File = withContext(Dispatchers.IO) {
+        BackupManager.createBackupJson(getApplication(), transactions, loans, subscriptions)
+    }
 
     fun restoreFromJson(jsonString: String, onResult: (Boolean, Int) -> Unit) {
         viewModelScope.launch {
             try {
-                val restored = BackupManager.parseBackupJson(jsonString)
+                val restored = withContext(Dispatchers.IO) {
+                    BackupManager.parseBackupJson(jsonString)
+                }
                 val totalRestored = restored.transactions.size + restored.loans.size + restored.subscriptions.size
                 if (totalRestored == 0) {
                     onResult(false, 0)

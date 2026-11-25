@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.nan.stash.data.model.DayTrend
 import com.nan.stash.ui.theme.incomeColor
 import com.nan.stash.ui.theme.spendingColor
+import com.nan.stash.ui.util.AnalyticsCalculator
 import java.text.NumberFormat
 
 @Composable
@@ -93,8 +94,7 @@ fun WeeklyCashFlowCard(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = if (!hasWeekActivity) "No activity this week" else {
-                            val sign = if (totalWeekNet >= 0) "+" else "-"
-                            "Week Net: $sign$currencySymbol${currencyFormatter.format(Math.abs(totalWeekNet))}"
+                            "Week Net: ${AnalyticsCalculator.formatSignedCurrency(totalWeekNet, currencySymbol, currencyFormatter, showPlus = true)}"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (!hasWeekActivity) MaterialTheme.colorScheme.onSurfaceVariant else if (totalWeekNet >= 0) MaterialTheme.colorScheme.incomeColor else MaterialTheme.colorScheme.spendingColor,
@@ -124,8 +124,13 @@ fun WeeklyCashFlowCard(
                         shape = RoundedCornerShape(12.dp),
                         color = badgeColor
                     ) {
+                        val badgeAmount = if (amount == 0.0) {
+                            "${currencySymbol}0.00"
+                        } else {
+                            AnalyticsCalculator.formatSignedCurrency(selectedDay.net, currencySymbol, currencyFormatter, showPlus = true)
+                        }
                         Text(
-                            text = "${selectedDay.fullDayName}: ${if (amount == 0.0) currencySymbol + "0.00" else (if (isPositive) "+" else "-") + currencySymbol + currencyFormatter.format(amount)}",
+                            text = "${selectedDay.fullDayName}: $badgeAmount",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = textColor,
@@ -283,7 +288,7 @@ fun WeeklyCashFlowCard(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        if (selectedDay.hasActivity) {
+                        if (selectedDay.income > 0 || selectedDay.expense > 0) {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 if (selectedDay.income > 0) {
                                     Text(

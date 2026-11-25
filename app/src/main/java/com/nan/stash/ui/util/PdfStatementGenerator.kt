@@ -6,14 +6,12 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
-import android.os.Environment
+import com.nan.stash.data.backup.BackupManager
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 object PdfStatementGenerator {
@@ -31,8 +29,7 @@ object PdfStatementGenerator {
         try {
             val paintText = Paint(Paint.ANTI_ALIAS_FLAG)
             val paintBg = Paint(Paint.ANTI_ALIAS_FLAG)
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val generatedDateStr = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault()).format(Date())
+            val generatedDateStr = DateUtils.formatPdfDateTime(System.currentTimeMillis())
 
             val balances = AnalyticsCalculator.calculateWalletBalances(transactions)
             val totalIncome = balances.totalIncome
@@ -97,8 +94,7 @@ object PdfStatementGenerator {
             paintText.textSize = 13f
             paintText.isFakeBoldText = true
             paintText.color = if (netSavings >= 0) Color.rgb(22, 163, 74) else Color.rgb(220, 38, 38)
-            val netSign = if (netSavings >= 0) "+" else ""
-            c.drawText("$netSign$currencySymbol${String.format(Locale.US, "%.2f", netSavings)}", MARGIN + 2 * colW + 10f, 122f, paintText)
+            c.drawText(AnalyticsCalculator.formatSignedCurrency(netSavings, currencySymbol, showPlus = true), MARGIN + 2 * colW + 10f, 122f, paintText)
 
             // Wallet Split
             paintText.textSize = 9f
@@ -108,9 +104,9 @@ object PdfStatementGenerator {
             paintText.textSize = 10f
             paintText.isFakeBoldText = true
             paintText.color = Color.rgb(37, 99, 235)
-            c.drawText("Bank: $currencySymbol${String.format(Locale.US, "%.2f", onlineBal)}", MARGIN + 3 * colW + 10f, 120f, paintText)
+            c.drawText("Bank: ${AnalyticsCalculator.formatSignedCurrency(onlineBal, currencySymbol)}", MARGIN + 3 * colW + 10f, 120f, paintText)
             paintText.color = Color.rgb(5, 150, 105)
-            c.drawText("Cash: $currencySymbol${String.format(Locale.US, "%.2f", cashBal)}", MARGIN + 3 * colW + 10f, 136f, paintText)
+            c.drawText("Cash: ${AnalyticsCalculator.formatSignedCurrency(cashBal, currencySymbol)}", MARGIN + 3 * colW + 10f, 136f, paintText)
         }
 
         fun drawTableHeader(c: Canvas, y: Float) {
@@ -169,7 +165,7 @@ object PdfStatementGenerator {
             paintText.color = Color.rgb(71, 85, 105)
 
             // Date
-            canvas.drawText(dateFormat.format(Date(t.timestamp)), MARGIN + 6f, currentY + 12f, paintText)
+            canvas.drawText(DateUtils.formatDateKey(t.timestamp), MARGIN + 6f, currentY + 12f, paintText)
 
             // Type
             paintText.isFakeBoldText = true
@@ -222,11 +218,8 @@ object PdfStatementGenerator {
 
         document.finishPage(page)
 
-        val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val filename = "stash_statement_$timestampStr.pdf"
-        val targetDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-        if (!targetDir.exists()) targetDir.mkdirs()
-        val outputFile = File(targetDir, filename)
+        val filename = "stash_statement_${DateUtils.formatFileTimestamp()}.pdf"
+        val outputFile = BackupManager.createShareFile(context, filename)
 
         FileOutputStream(outputFile).use { out ->
             document.writeTo(out)

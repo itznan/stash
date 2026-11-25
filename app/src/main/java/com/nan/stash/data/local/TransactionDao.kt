@@ -28,7 +28,4 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions")
     suspend fun clearAllTransactions()
-
-    @Query("SELECT COUNT(*) FROM transactions")
-    suspend fun getCount(): Int
 }

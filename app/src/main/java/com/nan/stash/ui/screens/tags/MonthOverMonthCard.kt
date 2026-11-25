@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.nan.stash.data.model.MonthComparison
 import com.nan.stash.ui.theme.incomeColor
 import com.nan.stash.ui.theme.spendingColor
+import com.nan.stash.ui.util.AnalyticsCalculator
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -279,9 +280,8 @@ fun MonthOverMonthCard(
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
-                        val netSign = if (monthComparison.currentNet >= 0) "+" else "-"
                         Text(
-                            text = "$netSign$currencySymbol${currencyFormatter.format(Math.abs(monthComparison.currentNet))}",
+                            text = AnalyticsCalculator.formatSignedCurrency(monthComparison.currentNet, currencySymbol, currencyFormatter, showPlus = true),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = if (monthComparison.currentNet >= 0) MaterialTheme.colorScheme.incomeColor else MaterialTheme.colorScheme.spendingColor
                         )
@@ -293,9 +293,8 @@ fun MonthOverMonthCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        val prevNetSign = if (monthComparison.previousNet >= 0) "+" else "-"
                         Text(
-                            text = "$prevNetSign$currencySymbol${currencyFormatter.format(Math.abs(monthComparison.previousNet))}",
+                            text = AnalyticsCalculator.formatSignedCurrency(monthComparison.previousNet, currencySymbol, currencyFormatter, showPlus = true),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

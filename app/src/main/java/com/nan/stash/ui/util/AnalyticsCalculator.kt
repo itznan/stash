@@ -1,15 +1,17 @@
 package com.nan.stash.ui.util
 
+import com.nan.stash.data.local.LoanEntity
 import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.CategorySummary
 import com.nan.stash.data.model.DayTrend
 import com.nan.stash.data.model.MonthComparison
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
-import java.text.SimpleDateFormat
+import java.text.NumberFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToLong
 
 data class WalletBalances(
     val onlineBalance: Double = 0.0,
@@ -17,68 +19,133 @@ data class WalletBalances(
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0
 ) {
-    val netBalance: Double get() = onlineBalance + cashBalance
+    val netBalance: Double
+        get() = AnalyticsCalculator.fromCents(
+            AnalyticsCalculator.toCents(onlineBalance) + AnalyticsCalculator.toCents(cashBalance)
+        )
 }
 
 object AnalyticsCalculator {
 
+    fun toCents(amount: Double): Long = (amount * 100.0).roundToLong()
+
+    fun fromCents(cents: Long): Double = cents / 100.0
+
+    fun formatSignedCurrency(
+        amount: Double,
+        currencySymbol: String,
+        formatter: NumberFormat? = null,
+        showPlus: Boolean = false
+    ): String {
+        val cents = toCents(amount)
+        val sign = when {
+            cents < 0L -> "-"
+            showPlus -> "+"
+            else -> ""
+        }
+        val absVal = fromCents(abs(cents))
+        val formatted = formatter?.format(absVal) ?: String.format(Locale.US, "%.2f", absVal)
+        return "$sign$currencySymbol$formatted"
+    }
+
+    fun applyRepayment(loan: LoanEntity, amountRepaid: Double): LoanEntity {
+        val newRemainingCents = (toCents(loan.remainingAmount) - toCents(amountRepaid)).coerceAtLeast(0L)
+        return loan.copy(
+            remainingAmount = fromCents(newRemainingCents),
+            isSettled = newRemainingCents == 0L
+        )
+    }
+
+    fun applyAdditionalLoan(loan: LoanEntity, additionalAmount: Double): LoanEntity {
+        val addCents = toCents(additionalAmount)
+        return loan.copy(
+            totalAmount = fromCents(toCents(loan.totalAmount) + addCents),
+            remainingAmount = fromCents(toCents(loan.remainingAmount) + addCents),
+            isSettled = false
+        )
+    }
+
     fun calculateWalletBalances(transactions: List<TransactionEntity>): WalletBalances {
-        var online = 0.0
-        var cash = 0.0
-        var income = 0.0
-        var expense = 0.0
+        var onlineCents = 0L
+        var cashCents = 0L
+        var incomeCents = 0L
+        var expenseCents = 0L
         for (t in transactions) {
+            val cents = toCents(t.amount)
             val isOnline = t.paymentMode == PaymentMode.ONLINE
             when (t.type) {
                 TransactionType.INCOME -> {
-                    income += t.amount
-                    if (isOnline) online += t.amount else cash += t.amount
+                    incomeCents += cents
+                    if (isOnline) onlineCents += cents else cashCents += cents
                 }
                 TransactionType.EXPENSE -> {
-                    expense += t.amount
-                    if (isOnline) online -= t.amount else cash -= t.amount
+                    expenseCents += cents
+                    if (isOnline) onlineCents -= cents else cashCents -= cents
                 }
                 TransactionType.TRANSFER -> {
                     if (isOnline) {
-                        online -= t.amount
-                        cash += t.amount
+                        onlineCents -= cents
+                        cashCents += cents
                     } else {
-                        cash -= t.amount
-                        online += t.amount
+                        cashCents -= cents
+                        onlineCents += cents
                     }
                 }
                 TransactionType.LEND -> {
-                    if (isOnline) online -= t.amount else cash -= t.amount
+                    if (isOnline) onlineCents -= cents else cashCents -= cents
                 }
                 TransactionType.REPAYMENT -> {
-                    if (isOnline) online += t.amount else cash += t.amount
+                    if (isOnline) onlineCents += cents else cashCents += cents
                 }
             }
         }
         return WalletBalances(
-            onlineBalance = online,
-            cashBalance = cash,
-            totalIncome = income,
-            totalExpense = expense
+            onlineBalance = fromCents(onlineCents),
+            cashBalance = fromCents(cashCents),
+            totalIncome = fromCents(incomeCents),
+            totalExpense = fromCents(expenseCents)
         )
     }
 
     fun isLowBalance(balance: Double, threshold: Double, enabled: Boolean): Boolean {
-        return enabled && threshold > 0.0 && balance <= threshold
+        return enabled && toCents(threshold) > 0L && toCents(balance) <= toCents(threshold)
+    }
+
+    private fun monthBounds(): Triple<Long, Long, Long> {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val curMonthStart = cal.timeInMillis
+        val nextMonthStart = (cal.clone() as Calendar).apply { add(Calendar.MONTH, 1) }.timeInMillis
+        val prevMonthStart = (cal.clone() as Calendar).apply { add(Calendar.MONTH, -1) }.timeInMillis
+        return Triple(prevMonthStart, curMonthStart, nextMonthStart)
     }
 
     fun calculateCategorySummaries(transactions: List<TransactionEntity>): List<CategorySummary> {
-        val expenses = transactions.filter { it.type == TransactionType.EXPENSE }
-        val totalExpense = expenses.sumOf { it.amount }
-        if (totalExpense <= 0.0) return emptyList()
+        val (_, curMonthStart, nextMonthStart) = monthBounds()
+        val totalsByTag = LinkedHashMap<String, Long>()
+        var totalExpenseCents = 0L
+        for (t in transactions) {
+            if (t.type == TransactionType.EXPENSE && t.timestamp in curMonthStart until nextMonthStart) {
+                val cents = toCents(t.amount)
+                if (cents > 0L) {
+                    totalExpenseCents += cents
+                    totalsByTag[t.tag] = (totalsByTag[t.tag] ?: 0L) + cents
+                }
+            }
+        }
+        if (totalExpenseCents <= 0L) return emptyList()
 
-        return expenses.groupBy { it.tag }
-            .map { (tag, list) ->
-                val sum = list.sumOf { it.amount }
+        return totalsByTag.entries
+            .map { (tag, sumCents) ->
                 CategorySummary(
                     tag = tag,
-                    amount = sum,
-                    percentage = (sum / totalExpense * 100).toFloat()
+                    amount = fromCents(sumCents),
+                    percentage = (sumCents.toDouble() / totalExpenseCents.toDouble() * 100.0).toFloat()
                 )
             }
             .sortedByDescending { it.amount }
@@ -90,7 +157,6 @@ object AnalyticsCalculator {
         val nowCal = Calendar.getInstance()
         val currentDayIndex = (nowCal.get(Calendar.DAY_OF_WEEK) + 5) % 7 // Monday = 0 .. Sunday = 6
 
-        // Compute start of Monday of the current week
         val mondayCal = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
@@ -99,87 +165,92 @@ object AnalyticsCalculator {
             add(Calendar.DAY_OF_YEAR, -currentDayIndex)
         }
 
-        return (0..6).map { i ->
-            val dayCal = (mondayCal.clone() as Calendar).apply {
+        val dayStarts = LongArray(8)
+        for (i in 0..7) {
+            dayStarts[i] = (mondayCal.clone() as Calendar).apply {
                 add(Calendar.DAY_OF_YEAR, i)
-            }
-            val startOfDay = dayCal.timeInMillis
-            val endOfDay = (dayCal.clone() as Calendar).apply {
-                add(Calendar.DAY_OF_YEAR, 1)
             }.timeInMillis
+        }
 
-            val dayTransactions = transactions.filter { it.timestamp in startOfDay until endOfDay }
-            val income = dayTransactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-            val expense = dayTransactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-            val net = income - expense
-            val hasActivity = dayTransactions.isNotEmpty()
+        val incomeCents = LongArray(7)
+        val expenseCents = LongArray(7)
+        val weekStart = dayStarts[0]
+        val weekEnd = dayStarts[7]
+        for (t in transactions) {
+            if (t.timestamp !in weekStart until weekEnd) continue
+            if (t.type != TransactionType.INCOME && t.type != TransactionType.EXPENSE) continue
+            for (d in 0..6) {
+                if (t.timestamp in dayStarts[d] until dayStarts[d + 1]) {
+                    val cents = toCents(t.amount)
+                    if (t.type == TransactionType.INCOME) incomeCents[d] += cents else expenseCents[d] += cents
+                    break
+                }
+            }
+        }
 
+        return (0..6).map { i ->
+            val inc = fromCents(incomeCents[i])
+            val exp = fromCents(expenseCents[i])
+            val netCents = incomeCents[i] - expenseCents[i]
+            val net = fromCents(netCents)
             DayTrend(
                 dayLabel = days[i],
                 fullDayName = fullDays[i],
                 isToday = (i == currentDayIndex),
-                income = income,
-                expense = expense,
+                income = inc,
+                expense = exp,
                 net = net,
-                amount = Math.abs(net),
-                isPositive = net >= 0,
-                hasActivity = hasActivity
+                amount = fromCents(abs(netCents)),
+                isPositive = netCents >= 0L,
+                hasActivity = incomeCents[i] > 0L || expenseCents[i] > 0L
             )
         }
     }
 
     fun calculateMonthComparison(transactions: List<TransactionEntity>): MonthComparison {
-        val now = Calendar.getInstance()
-        val curYear = now.get(Calendar.YEAR)
-        val curMonth = now.get(Calendar.MONTH) // 0-based
+        val (prevMonthStart, curMonthStart, nextMonthStart) = monthBounds()
 
-        val curMonthStart = Calendar.getInstance().apply {
-            set(curYear, curMonth, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        val nextMonthStart = Calendar.getInstance().apply {
-            set(curYear, curMonth, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-            add(Calendar.MONTH, 1)
-        }.timeInMillis
-
-        val prevMonthCal = Calendar.getInstance().apply {
-            set(curYear, curMonth, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-            add(Calendar.MONTH, -1)
+        var curIncomeCents = 0L
+        var curExpenseCents = 0L
+        var prevIncomeCents = 0L
+        var prevExpenseCents = 0L
+        for (t in transactions) {
+            val cents = toCents(t.amount)
+            when {
+                t.timestamp in curMonthStart until nextMonthStart -> {
+                    if (t.type == TransactionType.INCOME) curIncomeCents += cents
+                    else if (t.type == TransactionType.EXPENSE) curExpenseCents += cents
+                }
+                t.timestamp in prevMonthStart until curMonthStart -> {
+                    if (t.type == TransactionType.INCOME) prevIncomeCents += cents
+                    else if (t.type == TransactionType.EXPENSE) prevExpenseCents += cents
+                }
+            }
         }
-        val prevMonthStart = prevMonthCal.timeInMillis
 
-        val curMonthName = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(curMonthStart))
-        val prevMonthName = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(prevMonthStart))
+        val curIncome = fromCents(curIncomeCents)
+        val curExpense = fromCents(curExpenseCents)
+        val curNet = fromCents(curIncomeCents - curExpenseCents)
 
-        val curTx = transactions.filter { it.timestamp in curMonthStart until nextMonthStart }
-        val prevTx = transactions.filter { it.timestamp in prevMonthStart until curMonthStart }
+        val prevIncome = fromCents(prevIncomeCents)
+        val prevExpense = fromCents(prevExpenseCents)
+        val prevNet = fromCents(prevIncomeCents - prevExpenseCents)
 
-        val curIncome = curTx.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-        val curExpense = curTx.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-        val curNet = curIncome - curExpense
-
-        val prevIncome = prevTx.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
-        val prevExpense = prevTx.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
-        val prevNet = prevIncome - prevExpense
-
-        val expenseDiffPct = if (prevExpense > 0.0) {
-            (((curExpense - prevExpense) / prevExpense) * 100).toFloat()
-        } else if (curExpense > 0.0) {
+        val expenseDiffPct = if (prevExpenseCents > 0L) {
+            (((curExpenseCents - prevExpenseCents).toDouble() / prevExpenseCents) * 100.0).toFloat()
+        } else if (curExpenseCents > 0L) {
             100f
         } else 0f
 
-        val incomeDiffPct = if (prevIncome > 0.0) {
-            (((curIncome - prevIncome) / prevIncome) * 100).toFloat()
-        } else if (curIncome > 0.0) {
+        val incomeDiffPct = if (prevIncomeCents > 0L) {
+            (((curIncomeCents - prevIncomeCents).toDouble() / prevIncomeCents) * 100.0).toFloat()
+        } else if (curIncomeCents > 0L) {
             100f
         } else 0f
 
         return MonthComparison(
-            currentMonthLabel = curMonthName,
-            previousMonthLabel = prevMonthName,
+            currentMonthLabel = DateUtils.formatMonthYear(curMonthStart),
+            previousMonthLabel = DateUtils.formatMonthYear(prevMonthStart),
             currentIncome = curIncome,
             previousIncome = prevIncome,
             currentExpense = curExpense,
@@ -187,8 +258,7 @@ object AnalyticsCalculator {
             currentNet = curNet,
             previousNet = prevNet,
             expenseDiffPercentage = expenseDiffPct,
-            incomeDiffPercentage = incomeDiffPct,
-            hasComparisonData = curTx.isNotEmpty() || prevTx.isNotEmpty()
+            incomeDiffPercentage = incomeDiffPct
         )
     }
 }

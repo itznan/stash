@@ -61,7 +61,7 @@ fun SubscriptionManagerSheet(
 
     val totalMonthly = subscriptions.filter { it.isActive }.sumOf { it.amount }
 
-    val (startOfMonth, endOfMonth) = remember {
+    val (startOfMonth, endOfMonth) = remember(subscriptions) {
         val cal = Calendar.getInstance().apply {
             set(Calendar.DAY_OF_MONTH, 1)
             set(Calendar.HOUR_OF_DAY, 0)

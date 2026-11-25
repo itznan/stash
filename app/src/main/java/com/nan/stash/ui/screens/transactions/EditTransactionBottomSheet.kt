@@ -52,11 +52,11 @@ import com.nan.stash.data.local.TransactionEntity
 import com.nan.stash.data.model.PaymentMode
 import com.nan.stash.data.model.TransactionType
 import com.nan.stash.ui.components.getTagIcon
+import com.nan.stash.ui.components.sanitizeDecimalInput
 import com.nan.stash.ui.theme.incomeColor
 import com.nan.stash.ui.theme.spendingColor
+import com.nan.stash.ui.util.DateUtils
 import com.nan.stash.ui.util.StashHaptics
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -85,7 +85,7 @@ fun EditTransactionBottomSheet(
 
     val parsedAmount = amountText.toDoubleOrNull() ?: 0.0
     val dateLabel = remember(transaction.timestamp) {
-        SimpleDateFormat("EEE, MMM dd, yyyy • hh:mm a", Locale.getDefault()).format(Date(transaction.timestamp))
+        DateUtils.formatDateTime(transaction.timestamp)
     }
 
     ModalBottomSheet(
@@ -134,7 +134,11 @@ fun EditTransactionBottomSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (transaction.type == TransactionType.LEND) "Lent Money Record" else "Loan Repayment Record",
+                        text = if (transaction.type == TransactionType.LEND) {
+                            "Lent Money Record — edit amount in Lent Money Manager"
+                        } else {
+                            "Loan Repayment Record — edit amount in Lent Money Manager"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -151,7 +155,9 @@ fun EditTransactionBottomSheet(
                         selected = currentType == TransactionType.EXPENSE,
                         onClick = {
                             currentType = TransactionType.EXPENSE
-                            if (selectedTag in incomeTags) selectedTag = "Food"
+                            if (selectedTag !in expenseTags) {
+                                selectedTag = if (transaction.type == TransactionType.EXPENSE) transaction.tag else "Food"
+                            }
                         },
                         label = { Text("Expense") },
                         colors = FilterChipDefaults.filterChipColors(
@@ -165,7 +171,9 @@ fun EditTransactionBottomSheet(
                         selected = currentType == TransactionType.INCOME,
                         onClick = {
                             currentType = TransactionType.INCOME
-                            if (selectedTag in expenseTags) selectedTag = "Salary"
+                            if (selectedTag !in incomeTags) {
+                                selectedTag = if (transaction.type == TransactionType.INCOME) transaction.tag else "Salary"
+                            }
                         },
                         label = { Text("Income") },
                         colors = FilterChipDefaults.filterChipColors(
@@ -197,12 +205,13 @@ fun EditTransactionBottomSheet(
             OutlinedTextField(
                 value = amountText,
                 onValueChange = { input ->
-                    val clean = input.replace(',', '.')
-                    if (clean.isEmpty() || clean.matches(Regex("""^\d*(\.\d{0,2})?$"""))) {
+                    val clean = sanitizeDecimalInput(input)
+                    if (clean != null) {
                         StashHaptics.keyTap(haptic)
                         amountText = clean
                     }
                 },
+                enabled = !isLoanTransaction,
                 label = { Text("Amount ($currencySymbol)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -232,6 +241,7 @@ fun EditTransactionBottomSheet(
             ) {
                 FilterChip(
                     selected = selectedPaymentMode == PaymentMode.ONLINE,
+                    enabled = !isLoanTransaction,
                     onClick = {
                         selectedPaymentMode = PaymentMode.ONLINE
                         if (currentType == TransactionType.TRANSFER) {
@@ -249,6 +259,7 @@ fun EditTransactionBottomSheet(
 
                 FilterChip(
                     selected = selectedPaymentMode == PaymentMode.CASH,
+                    enabled = !isLoanTransaction,
                     onClick = {
                         selectedPaymentMode = PaymentMode.CASH
                         if (currentType == TransactionType.TRANSFER) {
@@ -279,7 +290,14 @@ fun EditTransactionBottomSheet(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                val availableTags = if (currentType == TransactionType.INCOME) incomeTags else expenseTags
+                val baseTags = if (currentType == TransactionType.INCOME) incomeTags else expenseTags
+                val availableTags = remember(currentType, transaction.tag) {
+                    if (currentType == transaction.type && baseTags.none { it.equals(transaction.tag, ignoreCase = true) }) {
+                        baseTags + transaction.tag
+                    } else {
+                        baseTags
+                    }
+                }
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -329,10 +347,10 @@ fun EditTransactionBottomSheet(
 
                         val updated = transaction.copy(
                             type = if (isLoanTransaction) transaction.type else currentType,
-                            amount = parsedAmount,
+                            amount = if (isLoanTransaction) transaction.amount else parsedAmount,
                             tag = finalTag,
                             note = noteText,
-                            paymentMode = selectedPaymentMode
+                            paymentMode = if (isLoanTransaction) transaction.paymentMode else selectedPaymentMode
                         )
                         onSave(updated)
                         onDismiss()

@@ -10,12 +10,12 @@ import android.widget.RemoteViews
 import com.nan.stash.MainActivity
 import com.nan.stash.R
 import com.nan.stash.data.local.AppDatabase
+import com.nan.stash.data.local.SettingsDataStore
 import com.nan.stash.ui.util.AnalyticsCalculator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 class StashWidgetProvider : AppWidgetProvider() {
 
@@ -56,11 +56,12 @@ class StashWidgetProvider : AppWidgetProvider() {
             try {
                 val db = AppDatabase.getDatabase(context)
                 val transactions = db.transactionDao().getAllTransactions().firstOrNull() ?: emptyList()
+                val currencySymbol = SettingsDataStore(context).settingsFlow.firstOrNull()?.currencySymbol ?: "$"
                 val balances = AnalyticsCalculator.calculateWalletBalances(transactions)
 
                 val views = RemoteViews(context.packageName, R.layout.widget_stash).apply {
-                    setTextViewText(R.id.widget_online_val, String.format(Locale.US, "%.2f", balances.onlineBalance))
-                    setTextViewText(R.id.widget_cash_val, String.format(Locale.US, "%.2f", balances.cashBalance))
+                    setTextViewText(R.id.widget_online_val, AnalyticsCalculator.formatSignedCurrency(balances.onlineBalance, currencySymbol))
+                    setTextViewText(R.id.widget_cash_val, AnalyticsCalculator.formatSignedCurrency(balances.cashBalance, currencySymbol))
 
                     // Open app on click header
                     val appIntent = PendingIntent.getActivity(

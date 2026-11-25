@@ -41,7 +41,6 @@ import com.nan.stash.ui.screens.transactions.EditTransactionBottomSheet
 import com.nan.stash.ui.screens.transactions.SpendMoneyBottomSheet
 import com.nan.stash.ui.screens.transactions.TransferMoneyBottomSheet
 import com.nan.stash.ui.theme.StashTheme
-import com.nan.stash.ui.util.AnalyticsCalculator
 import com.nan.stash.ui.widget.StashWidgetProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -64,7 +63,7 @@ fun StashApp(
     val weeklyTrends by viewModel.weeklyTrends.collectAsState()
     val categorySummaries by viewModel.categorySummaries.collectAsState()
     val monthComparison by viewModel.monthComparison.collectAsState()
-    val balances = remember(transactions) { AnalyticsCalculator.calculateWalletBalances(transactions) }
+    val balances by viewModel.balances.collectAsState()
 
     val isDarkTheme = when (settings.themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -172,6 +171,7 @@ fun StashApp(
                         0 -> HomeScreen(
                             innerPadding = innerPadding,
                             transactions = transactions,
+                            balances = balances,
                             currencySymbol = settings.currencySymbol,
                             weeklyTrends = weeklyTrends,
                             onSeeAllClick = {
@@ -201,12 +201,11 @@ fun StashApp(
                             transactions = transactions,
                             currencySymbol = settings.currencySymbol,
                             onDeleteTransaction = { viewModel.deleteTransaction(it) },
-                            onClearAll = { viewModel.clearAllData() },
+                            onClearAll = { viewModel.clearTransactions() },
                             onTransactionClick = { editingTransaction = it }
                         )
                         2 -> TagsScreen(
                             innerPadding = innerPadding,
-                            transactions = transactions,
                             categorySummaries = categorySummaries,
                             monthComparison = monthComparison,
                             currencySymbol = settings.currencySymbol,
