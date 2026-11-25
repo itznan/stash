@@ -1,0 +1,6 @@
+Release v1.0.7:
+
+- Data Safety: Keep History clear strictly to transactions; clarify full reset in Settings
+- Security & Privacy: Disable cloud backup of financial database and harden biometric re-lock
+- Accurate Analytics: Whole-cent balance math, fixed negative formatting, and true This Month tag totals
+- Reliability & Speed: Background CSV/JSON/PDF exports, strict backup validation, and currency-aware widget
